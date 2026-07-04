@@ -7,26 +7,25 @@
 <style>
   /* ---------- Design tokens: nitrided-steel handpan palette ---------- */
   :root{
-    --bg:        #0f1317;   /* deep charcoal, like a dark stage        */
+    --bg:        #0f1317;
     --panel:     #171d23;
     --panel-2:   #1c242c;
     --line:      #2a343e;
-    --steel-hi:  #39454f;   /* pan shell highlight                     */
-    --steel-lo:  #202932;   /* pan shell shadow                        */
-    --pad:       #e9e6df;   /* tone-field ivory                        */
+    --pad:       #e9e6df;
     --pad-dim:   #b9bcb9;
     --ink:       #e8e4dc;
     --muted:     #8b96a0;
-    --brass:     #d8a45c;   /* strike glow — warm brass                */
+    --brass:     #d8a45c;   /* right hand — warm brass  */
     --brass-dp:  #a97b3d;
-    --ding:     #c9d4dd;
+    --lblue:     #8fc7e8;   /* left hand — cool steel   */
+    --ding:      #c9d4dd;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{background:var(--bg);color:var(--ink);
     font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;}
   body{min-height:100vh;padding:28px 20px 60px;}
 
-  .wrap{max-width:1060px;margin:0 auto;}
+  .wrap{max-width:1100px;margin:0 auto;}
   header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:6px;}
   h1{font-size:26px;font-weight:600;letter-spacing:.04em;}
   h1 em{font-style:normal;color:var(--brass);}
@@ -34,9 +33,9 @@
   .scale-tag{margin-left:auto;font-size:12px;color:var(--muted);
     border:1px solid var(--line);border-radius:999px;padding:4px 12px;}
 
-  .grid{display:grid;grid-template-columns:minmax(340px,1fr) minmax(320px,420px);
+  .grid{display:grid;grid-template-columns:minmax(340px,1fr) minmax(330px,440px);
     gap:22px;margin-top:18px;align-items:start;}
-  @media (max-width:840px){.grid{grid-template-columns:1fr;}}
+  @media (max-width:860px){.grid{grid-template-columns:1fr;}}
 
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;}
   .card h2{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.18em;
@@ -49,12 +48,24 @@
   .pad-circle:hover{filter:brightness(1.12);}
   .pad-label{font-size:19px;font-weight:600;fill:#333c44;pointer-events:none;}
   .pad-num{font-size:12px;fill:#77828c;pointer-events:none;}
-  .hit .pad-fill{fill:var(--brass);}
-  .hit .pad-label,.hit .pad-num{fill:#2a1d0a;}
-  .ripple{fill:none;stroke:var(--brass);stroke-width:2.5;pointer-events:none;
+  .hit-R .pad-fill{fill:var(--brass);}
+  .hit-L .pad-fill{fill:var(--lblue);}
+  .hit-R .pad-label,.hit-R .pad-num,
+  .hit-L .pad-label,.hit-L .pad-num{fill:#20160a;}
+  #tRing{cursor:pointer;transition:stroke .12s;}
+  #tRing:hover{stroke:#5b6a77;}
+  #tRing.hit-R{stroke:var(--brass);}
+  #tRing.hit-L{stroke:var(--lblue);}
+  #shell{cursor:pointer;transition:filter .1s;}
+  #shell.slap{filter:brightness(1.35);}
+  .ripple{fill:none;stroke-width:2.5;pointer-events:none;
     animation:rip .55s ease-out forwards;}
-  @keyframes rip{from{opacity:.85;transform:scale(1);}to{opacity:0;transform:scale(1.85);}}
+  @keyframes rip{from{opacity:.85;transform:scale(1);}to{opacity:0;transform:scale(1.8);}}
   @media (prefers-reduced-motion:reduce){.ripple{animation:none;opacity:0;}}
+  .legend{display:flex;gap:16px;justify-content:center;font-size:12px;color:var(--muted);
+    margin-top:10px;}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;
+    vertical-align:-1px;}
 
   /* ---------- Transport ---------- */
   .transport{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
@@ -76,28 +87,40 @@
   input[type=range]{width:100%;accent-color:var(--brass);height:4px;cursor:pointer;}
 
   /* ---------- Score ---------- */
-  textarea{width:100%;min-height:170px;resize:vertical;background:#12171c;color:var(--ink);
-    border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13.5px;line-height:1.7;
-    font-family:"SF Mono",Consolas,Menlo,monospace;}
+  textarea{width:100%;min-height:200px;resize:vertical;background:#12171c;color:var(--ink);
+    border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px;line-height:1.7;
+    font-family:"SF Mono",Consolas,Menlo,monospace;white-space:pre;}
   textarea:focus-visible{outline:2px solid var(--brass);outline-offset:1px;}
-  .score-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
-  .hint{font-size:12px;color:var(--muted);line-height:1.8;margin-top:10px;}
+  .score-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;}
+  select{font:inherit;background:var(--panel-2);color:var(--ink);border:1px solid var(--line);
+    border-radius:9px;padding:8px 10px;max-width:190px;cursor:pointer;}
+  .hint{font-size:12px;color:var(--muted);line-height:1.9;margin-top:10px;}
   .hint code{background:var(--panel-2);border:1px solid var(--line);border-radius:4px;
     padding:0 5px;color:var(--brass);font-family:Consolas,Menlo,monospace;}
 
   #trackView{margin-top:14px;background:#12171c;border:1px solid var(--line);border-radius:10px;
-    padding:12px;max-height:190px;overflow-y:auto;line-height:2.3;
-    font-family:"SF Mono",Consolas,Menlo,monospace;font-size:13px;}
-  .tok{display:inline-block;min-width:26px;text-align:center;border-radius:6px;padding:1px 5px;
-    margin:0 2px;color:var(--pad-dim);cursor:pointer;}
-  .tok:hover{background:var(--panel-2);}
-  .tok.ding{color:var(--ding);font-weight:600;}
-  .tok.rest{color:#4b565f;}
-  .tok.now{background:var(--brass);color:#20160a;font-weight:700;}
-  .bar{display:inline-block;width:1px;height:16px;background:var(--line);
-    vertical-align:middle;margin:0 7px;}
-  .vlabel{display:block;color:var(--muted);font-size:11px;letter-spacing:.14em;margin-top:6px;}
+    padding:10px 12px;max-height:230px;overflow-y:auto;
+    font-family:"SF Mono",Consolas,Menlo,monospace;font-size:12.5px;}
+  .vlabel{display:block;color:var(--muted);font-size:11px;letter-spacing:.14em;
+    margin:8px 0 3px;}
+  .block{line-height:1;}
+  .col{display:inline-flex;flex-direction:column;align-items:center;gap:2px;
+    border-radius:6px;padding:2px 1px;margin:2px 1px;cursor:pointer;vertical-align:middle;}
+  .col:hover{background:var(--panel-2);}
+  .col.now{background:var(--brass);}
+  .col.now .cell{color:#20160a !important;}
+  .cell{min-width:22px;text-align:center;line-height:1.5;color:var(--pad-dim);}
+  .cell.rest{color:#49545d;}
+  .cell.ding{color:var(--ding);font-weight:600;}
+  .barcol{display:inline-block;width:1px;height:26px;background:var(--line);
+    vertical-align:middle;margin:0 6px;}
+  .rowtag{display:inline-flex;flex-direction:column;gap:2px;margin-right:5px;
+    vertical-align:middle;}
+  .rowtag span{font-size:10px;line-height:1.5;text-align:center;}
+  .rowtag .r{color:var(--brass);}
+  .rowtag .l{color:var(--lblue);}
   .status{font-size:12px;color:var(--muted);margin-top:8px;min-height:16px;}
+  .status.warn{color:#e0b45f;}
 </style>
 </head>
 <body>
@@ -111,9 +134,15 @@
   <div class="grid">
     <!-- ================= Left: pan + transport ================= -->
     <div class="card">
-      <h2>手碟 · 点击音区可试听</h2>
+      <h2>手碟 · 点击音区 / T 环 / 碟面空白处可试听</h2>
       <div id="panBox">
         <svg id="pan" viewBox="0 0 500 500" role="img" aria-label="手碟布局图"></svg>
+      </div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--brass)"></span>右手 R</span>
+        <span><span class="dot" style="background:var(--lblue)"></span>左手 L</span>
+        <span>T = 肩音（Ding 外圈）</span>
+        <span>S = Slap（碟面）</span>
       </div>
 
       <div class="transport">
@@ -140,17 +169,30 @@
 
     <!-- ================= Right: score ================= -->
     <div class="card">
-      <h2>乐谱（可编辑）</h2>
-      <textarea id="scoreText" spellcheck="false"></textarea>
+      <h2>乐谱（可编辑 · 双行记法）</h2>
+      <textarea id="scoreText" spellcheck="false" wrap="off"></textarea>
       <div class="score-actions">
         <button id="btnApply">应用乐谱</button>
         <button id="btnReset">恢复 Pocket Groove 11</button>
+        <button id="btnPdf">导入 PDF 识谱</button>
+        <button id="btnExport">导出 .txt</button>
+        <button id="btnImport">导入 .txt</button>
       </div>
+      <div class="score-actions" id="libRow">
+        <select id="libSel" aria-label="曲库"></select>
+        <button id="btnLibSave">存入曲库</button>
+        <button id="btnLibLoad">载入</button>
+        <button id="btnLibDel">删除</button>
+      </div>
+      <input type="file" id="pdfFile" accept="application/pdf" hidden>
+      <input type="file" id="txtFile" accept=".txt,text/plain" hidden>
       <div class="hint">
-        记法：<code>D</code> = 中心 Ding，<code>1</code>–<code>8</code> = 音区编号，
-        <code>.</code> = 休止（空八分音符），<code>|</code> = 小节线（仅显示用），
-        <code>D+4</code> = 双手同击，<code>#</code> 开头为注释行。
-        每个记号占一个八分音符。点击下方任意记号可从该处开始播放。
+        <code>R:</code> 行是右手、紧跟的 <code>L:</code> 行是左手，按列对齐，每列一个八分音符；
+        两行同列都有音 = 双手同击。
+        记号：<code>D</code> Ding，<code>1</code>–<code>8</code> 音区，
+        <code>T</code> 肩音，<code>S</code> Slap，<code>.</code> 休止，
+        <code>|</code> 小节线（仅显示），<code>#</code> 注释行。
+        也兼容单行记法（不区分左右手）。点击下方任意列可从该处播放。
       </div>
       <div id="trackView"></div>
     </div>
@@ -161,12 +203,14 @@
 'use strict';
 /* =====================================================================
  * Handpan player — D Kurd 8+1
- * Web Audio synthesis + SVG visualization + text score playback
+ * Two-row (R/L hand) score, T shoulder tone, S slap,
+ * Web Audio synthesis + SVG visualization
  * ===================================================================== */
 
 /* ---------- Note table (name, frequency, ring angle from top, CW) ---- */
 const NOTES = {
   'D': { name:'D3', freq:146.83, ding:true },
+  'T': { name:'T',  freq:293.66, shoulder:true },  // measured: D4 attack (MIDI 62), D3 tail
   '1': { name:'A3',  freq:220.00, angle:180 },
   '2': { name:'Bb3', freq:233.08, angle:225 },
   '3': { name:'C4',  freq:261.63, angle:135 },
@@ -177,29 +221,73 @@ const NOTES = {
   '8': { name:'A4',  freq:440.00, angle:  0 },
 };
 
-/* ---------- Default score: transcription of Notepan Pocket Groove 11.
- * Straight 8th notes; PDF text layout is ambiguous about exact rhythm,
- * so edit freely (add "." rests or "D+1" double hits as needed). ------ */
+/* ---------- Default score ---------------------------------------------
+ * Pocket Groove 11, two-row R/L format. Hands follow the PDF row order
+ * (upper row = R, lower row = L), recovered from the user's `X+Y` token
+ * order (first = upper). Rows for isolated single notes are inferred
+ * from pattern continuity and may need review.                          */
 const DEFAULT_SCORE = `# Pocket Groove 11 (D Kurd 8+1)  BPM=110
 # Variation 1
-D 4 1 4 D 1 4 D 4 1 | D 4 1 D 4 1 4 D 1 4 |
-D 5 2 5 D 2 5 D 5 2 | D 5 2 D 5 2 5 D 2 5 |
-D 6 1 6 D 1 6 D 6 1 | D 6 1 D 6 1 6 D 1 6 |
+R: D . 1 . D . 1 . | D . 1 . D . 1 .
+L: 4 . . 4 . . 4 . | . 4 . . 4 . . .
+
+R: D . 1 . D . 1 . | D . 1 . D . 1 .
+L: 4 . . 4 . . 4 . | . 4 . . 4 . . .
+
+R: D . 2 . D . 2 . | D . 2 . D . 2 .
+L: 5 . . 5 . . 5 . | . 5 . . 5 . . .
+
+R: D . 2 . D . 2 . | D . 2 . D . 2 .
+L: 5 . . 5 . . 5 . | . 5 . . 5 . . .
+
+R: D . 1 . D . 1 . | D . 1 . D . 1 .
+L: 6 . . 6 . . 6 . | . 6 . . 6 . . .
+
+R: D . 1 . D . 1 . | D . 1 . D . 1 .
+L: 6 . . 6 . . 6 . | . 6 . . 6 . . .
+
 # Variation 2
-D 7 2 7 D 2 7 D 7 2 | D 7 2 D 7 2 7 D 2 7 |
+R: D . 2 . D . 2 . | D . 2 . D . 2 .
+L: 7 . . 7 . . 7 . | . 7 . . 7 . . .
+
+R: D . 2 . D . 2 . | D . 2 . D . 2 .
+L: 7 . . 7 . . 7 . | . 7 . . 7 . . .
+
 # Variation 3
-D 8 1 7 D 1 6 D 8 1 | 7 D 1 6 D 8 1 7 D 1 6 |
-D 8 2 7 D 2 6 D 8 2 | 7 D 2 6 D 8 2 7 D 2 6 |
-D 8 1 7 D 1 6 D 8 1 | 7 D 1 6 D 8 1 7 D 1 6 |
+R: D . 1 7 D . 1 . | D . 1 7 D . 6 .
+L: 8 . . . . . 6 . | 8 . . . . . 1 .
+
+R: D . 1 7 D . 1 . | D . 1 7 D . 6 .
+L: 8 . . . . . 6 . | 8 . . . . . 1 .
+
+R: D . 2 7 D . 2 . | D . 2 7 D . 6 .
+L: 8 . . . . . 6 . | 8 . . . . . 2 .
+
+R: D . 2 7 D . 2 . | D . 2 7 D . 6 .
+L: 8 . . . . . 6 . | 8 . . . . . 2 .
+
+R: D . 1 7 D . 1 . | D . 1 7 D . 6 .
+L: 8 . . . . . 6 . | 8 . . . . . 1 .
+
+R: D . 1 7 D . 1 . | D . 1 7 D . 7 .
+L: 8 . . . . . 6 . | 8 . . . . . 1 .
+
 # Variation 4
-D 6 2 6 D 2 6 D 6 2 | D 6 2 D 4 1 4 D 1 4 |
-D`;
+R: D . 2 . D . 2 . | D . 2 . D . 2 .
+L: 6 . . 6 . . 6 . | . 6 . . 6 . . .
+
+R: D . 1 . D . 1 . | D . 1 . T . D .
+L: 4 . . 4 . . 4 . | . 4 . D . . . .
+
+# 结尾
+R: D
+L: 4`;
 
 /* =========================== Build the SVG pan ======================= */
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const pan = document.getElementById('pan');
-const CX = 250, CY = 250, RING_R = 168, PAD_R = 40, DING_R = 52;
-const padEls = {};   // key -> {g, cx, cy, r}
+const CX = 250, CY = 250, RING_R = 168, PAD_R = 40, DING_R = 50, T_R = 68;
+const padEls = {};   // key -> {g, cx, cy, r, ring?}
 
 function el(tag, attrs, parent){
   const n = document.createElementNS(SVG_NS, tag);
@@ -209,9 +297,8 @@ function el(tag, attrs, parent){
 }
 
 function buildPan(){
-  // defs: metallic shell gradient
   const defs = el('defs', {}, pan);
-  const grad = el('radialGradient', {id:'shell', cx:'38%', cy:'32%', r:'85%'}, defs);
+  const grad = el('radialGradient', {id:'shellg', cx:'38%', cy:'32%', r:'85%'}, defs);
   el('stop', {offset:'0%',  'stop-color':'#414e59'}, grad);
   el('stop', {offset:'55%', 'stop-color':'#2c3742'}, grad);
   el('stop', {offset:'100%','stop-color':'#1b232b'}, grad);
@@ -219,9 +306,28 @@ function buildPan(){
   el('stop', {offset:'0%',  'stop-color':'#f4f2ec'}, padGrad);
   el('stop', {offset:'100%','stop-color':'#d5d3ca'}, padGrad);
 
-  // shell + rim
-  el('circle', {cx:CX, cy:CY, r:228, fill:'url(#shell)', stroke:'#465360', 'stroke-width':2}, pan);
-  el('circle', {cx:CX, cy:CY, r:214, fill:'none', stroke:'#161d24', 'stroke-width':1.5, opacity:.7}, pan);
+  // shell — clicking empty shell area previews a slap
+  const shell = el('circle', {id:'shell', cx:CX, cy:CY, r:228, fill:'url(#shellg)',
+    stroke:'#465360', 'stroke-width':2, tabindex:0, role:'button',
+    'aria-label':'Slap（碟面拍击）'}, pan);
+  el('circle', {cx:CX, cy:CY, r:214, fill:'none', stroke:'#161d24',
+    'stroke-width':1.5, opacity:.7, 'pointer-events':'none'}, pan);
+  const slapTrig = () => { ensureCtx(); playEventNow([{key:'S', hand:null}]); };
+  shell.addEventListener('click', slapTrig);
+  shell.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();slapTrig();} });
+
+  // T shoulder ring around the ding
+  const tRing = el('circle', {id:'tRing', cx:CX, cy:CY, r:T_R, fill:'none',
+    stroke:'#4a5763', 'stroke-width':13, 'pointer-events':'stroke',
+    tabindex:0, role:'button', 'aria-label':'肩音 T'}, pan);
+  el('text', {x:CX + (T_R+16)*Math.SQRT1_2, y:CY - (T_R+13)*Math.SQRT1_2,
+    class:'pad-num', 'text-anchor':'middle', 'pointer-events':'none'}, pan)
+    .textContent = 'T';
+  const tTrig = () => { ensureCtx(); playEventNow([{key:'T', hand:null}]); };
+  tRing.addEventListener('click', tTrig);
+  tRing.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();tTrig();} });
+  padEls['T'] = {g:tRing, cx:CX, cy:CY, r:T_R, ring:true};
+  padEls['S'] = {g:shell, cx:CX, cy:CY, r:228, shell:true};
 
   const makePad = (key, cx, cy, r) => {
     const g = el('g', {class:'pad-circle', tabindex:0, role:'button',
@@ -232,17 +338,17 @@ function buildPan(){
     el('text', {class:'pad-label', x:cx, y:cy + (n.ding ? 0 : -2),
                 'text-anchor':'middle', 'dominant-baseline':'middle'}, g)
       .textContent = n.name;
-    el('text', {class:'pad-num', x:cx, y:cy + 18,
-                'text-anchor':'middle'}, g)
+    el('text', {class:'pad-num', x:cx, y:cy + 18, 'text-anchor':'middle'}, g)
       .textContent = n.ding ? 'Ding' : key;
-    const trigger = () => { ensureCtx(); playHit(key, actx.currentTime, 0.9); flashPad(key); };
+    const trigger = () => { ensureCtx(); playEventNow([{key, hand:null}]); };
     g.addEventListener('click', trigger);
-    g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); trigger(); } });
+    g.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();trigger();} });
     padEls[key] = {g, cx, cy, r};
   };
 
   for (const key in NOTES){
     const n = NOTES[key];
+    if (n.shoulder) continue;
     if (n.ding){ makePad(key, CX, CY, DING_R); continue; }
     const a = n.angle * Math.PI / 180;
     makePad(key, CX + RING_R * Math.sin(a), CY - RING_R * Math.cos(a), PAD_R);
@@ -251,14 +357,26 @@ function buildPan(){
 buildPan();
 
 /* ------------------------- Visual strike ----------------------------- */
-function flashPad(key){
+function handColor(hand){ return hand === 'L' ? '#8fc7e8' : '#d8a45c'; }
+
+function flashPad(key, hand){
   const p = padEls[key];
   if (!p) return;
-  p.g.classList.add('hit');
-  setTimeout(() => p.g.classList.remove('hit'), 140);
-  // expanding ripple ring
+  if (p.shell){                       // slap: pulse the shell
+    p.g.classList.add('slap');
+    setTimeout(() => p.g.classList.remove('slap'), 120);
+    const rp = el('circle', {class:'ripple', cx:p.cx, cy:p.cy, r:200,
+      stroke:handColor(hand),
+      style:'transform-origin:'+p.cx+'px '+p.cy+'px; animation-duration:.35s'}, pan);
+    setTimeout(() => rp.remove(), 400);
+    return;
+  }
+  const cls = hand === 'L' ? 'hit-L' : 'hit-R';
+  p.g.classList.add(cls);
+  setTimeout(() => p.g.classList.remove(cls), 140);
   const rp = el('circle', {class:'ripple', cx:p.cx, cy:p.cy, r:p.r,
-                           style:'transform-origin:' + p.cx + 'px ' + p.cy + 'px'}, pan);
+    stroke:handColor(hand),
+    style:'transform-origin:' + p.cx + 'px ' + p.cy + 'px'}, pan);
   setTimeout(() => rp.remove(), 600);
 }
 
@@ -277,25 +395,37 @@ function ensureCtx(){
   if (actx.state === 'suspended') actx.resume();
 }
 
-/* Synthesize one handpan strike: fundamental + octave + compound fifth,
- * short noise transient for the finger "tak". */
+/* Tone field / ding: fundamental + octave + compound fifth partials.
+ * Shoulder (T): brighter, fewer lows, faster decay.
+ * Slap (S): unpitched — body thump + band-passed noise crack.           */
 function playHit(key, t, vel){
+  if (key === 'S'){ playSlap(t, vel); return; }
   const note = NOTES[key];
   if (!note) return;
-  const dur = note.ding ? 3.0 : 2.1;
+
+  let dur, partials, noiseF, noiseAmp;
+  if (note.shoulder){
+    // measured: strong D4 attack (MIDI 62) decaying into a faint D3 tail (MIDI 50)
+    dur = 1.8;
+    partials = [[1, 1.0], [1.5, 0.22], [2, 0.10], [0.5, 0.30]];
+    noiseF = note.freq * 3; noiseAmp = 0.30;
+  } else {
+    dur = note.ding ? 3.0 : 2.1;
+    partials = [[1, 1.0], [2, 0.55], [3, 0.22], [4.16, 0.05]];
+    noiseF = note.freq * 2.5; noiseAmp = 0.35;
+  }
+
   const g = actx.createGain();
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(0.5 * vel, t + 0.006);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   g.connect(master);
 
-  // partials tuned like a handpan tone field: f, 2f, 3f (+ faint 4.2f shimmer)
-  const partials = [[1, 1.0], [2, 0.55], [3, 0.22], [4.16, 0.05]];
   for (const [mult, amp] of partials){
     const o = actx.createOscillator();
     o.type = 'sine';
     o.frequency.value = note.freq * mult;
-    o.detune.value = (Math.random() * 6) - 3;   // slight inharmonic drift
+    o.detune.value = (Math.random() * 6) - 3;
     const og = actx.createGain();
     og.gain.value = amp;
     o.connect(og); og.connect(g);
@@ -309,14 +439,38 @@ function playHit(key, t, vel){
   for (let i = 0; i < nLen; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / nLen);
   const src = actx.createBufferSource(); src.buffer = buf;
   const bp = actx.createBiquadFilter();
-  bp.type = 'bandpass'; bp.frequency.value = note.freq * 2.5; bp.Q.value = 1.2;
-  const ng = actx.createGain(); ng.gain.value = 0.35 * vel;
+  bp.type = 'bandpass'; bp.frequency.value = noiseF; bp.Q.value = 1.2;
+  const ng = actx.createGain(); ng.gain.value = noiseAmp * vel;
   src.connect(bp); bp.connect(ng); ng.connect(g);
   src.start(t);
 }
 
+function playSlap(t, vel){
+  // low body thump with a fast downward pitch sweep
+  const o = actx.createOscillator();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(210, t);
+  o.frequency.exponentialRampToValueAtTime(85, t + 0.09);
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.55 * vel, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+  o.connect(g); g.connect(master);
+  o.start(t); o.stop(t + 0.18);
+
+  // noise crack, low-passed for a fleshy palm sound
+  const nLen = Math.floor(actx.sampleRate * 0.06);
+  const buf = actx.createBuffer(1, nLen, actx.sampleRate);
+  const ch = buf.getChannelData(0);
+  for (let i = 0; i < nLen; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / nLen, 2);
+  const src = actx.createBufferSource(); src.buffer = buf;
+  const lp = actx.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 1400; lp.Q.value = 0.8;
+  const ng = actx.createGain(); ng.gain.value = 0.6 * vel;
+  src.connect(lp); ng.connect(master); lp.connect(ng);
+  src.start(t);
+}
+
 function playTick(t, strong){
-  // metronome click
   const o = actx.createOscillator(), g = actx.createGain();
   o.type = 'square'; o.frequency.value = strong ? 1600 : 1100;
   g.gain.setValueAtTime(0.08, t);
@@ -325,33 +479,82 @@ function playTick(t, strong){
   o.start(t); o.stop(t + 0.05);
 }
 
+function playEventNow(hits){
+  for (const h of hits){ playHit(h.key, actx.currentTime, 0.9); flashPad(h.key, h.hand); }
+}
+
 /* ============================ Score parsing =========================== */
-/* Event: {keys:[...], tokenIdx}   Token list also keeps '|' for display. */
-let tokens = [];   // [{text, type:'note'|'rest'|'bar'|'label', eventIdx}]
-let events = [];   // playable events, each 1 eighth note long
+/* events: [{hits:[{key,hand}]}]  — each event = one eighth note.
+ * blocks: display structure — {label} or {cols:[...], single:bool}
+ * col: {bar:true} or {evIdx, rT, lT}                                     */
+let events = [], blocks = [], parseWarnings = [];
+
+function tokenize(s){
+  // Normalize glued tokens: ".|" -> ". |", "T." -> "T .", "1+4." -> "1+4 ."
+  return s.replace(/\|/g, ' | ')
+          .replace(/([DTSdts1-8+])\.(?!\S)/g, '$1 .')
+          .trim().split(/\s+/).filter(Boolean);
+}
+
+function isValidKey(k){ return k === 'S' || !!NOTES[k]; }
+
+function makeEventCol(rT, lT, neutral){
+  const hits = [];
+  const add = (tok, hand) => {
+    if (!tok || tok === '.' ) return;
+    for (const kRaw of tok.split('+')){
+      const k = kRaw.toUpperCase();
+      if (isValidKey(k)) hits.push({key:k, hand});
+    }
+  };
+  add(rT, neutral ? null : 'R'); add(lT, 'L');
+  const evIdx = events.length;
+  events.push({hits});
+  return {evIdx, rT: rT || '', lT: lT || ''};
+}
+
+function buildBlock(rToks, lToks, legacy){
+  const rEv = rToks ? rToks.filter(t => t !== '|') : null;
+  const lEv = lToks ? lToks.filter(t => t !== '|') : null;
+  const nR = rEv ? rEv.length : 0, nL = lEv ? lEv.length : 0;
+  if (rEv && lEv && nR !== nL)
+    parseWarnings.push('某组 R/L 列数不一致（R=' + nR + '，L=' + nL + '），短的一行按休止补齐');
+  const n = Math.max(nR, nL);
+  const guide = rToks || lToks;          // bar positions taken from this row
+  const cols = [];
+  let p = 0;
+  for (const t of guide){
+    if (t === '|'){ cols.push({bar:true}); continue; }
+    cols.push(makeEventCol(rEv ? rEv[p] : null, lEv ? lEv[p] : null, legacy));
+    p++;
+  }
+  while (p < n){ cols.push(makeEventCol(rEv ? rEv[p] : null, lEv ? lEv[p] : null, legacy)); p++; }
+  return {cols, single: !(rToks && lToks), legacy: !!legacy};
+}
 
 function parseScore(text){
-  tokens = []; events = [];
-  const lines = text.split('\n');
-  for (const line of lines){
-    const trimmed = line.trim();
-    if (trimmed.startsWith('#')){
-      tokens.push({text: trimmed.replace(/^#\s*/, ''), type:'label'});
-      continue;
+  events = []; blocks = []; parseWarnings = [];
+  const lines = text.split('\n').map(l => l.trim());
+  let i = 0;
+  while (i < lines.length){
+    const line = lines[i];
+    if (!line){ i++; continue; }
+    if (line.startsWith('#')){
+      blocks.push({label: line.replace(/^#\s*/, '')});
+      i++; continue;
     }
-    for (const raw of trimmed.split(/\s+/)){
-      if (!raw) continue;
-      if (raw === '|'){ tokens.push({text:'|', type:'bar'}); continue; }
-      if (raw === '.'){ 
-        tokens.push({text:'·', type:'rest', eventIdx: events.length});
-        events.push({keys: [], tokenIdx: tokens.length - 1});
-        continue;
-      }
-      const keys = raw.split('+').filter(k => NOTES[k]);
-      if (keys.length === 0) continue;   // skip unknown tokens silently
-      tokens.push({text: raw, type:'note', eventIdx: events.length,
-                   ding: keys.includes('D')});
-      events.push({keys, tokenIdx: tokens.length - 1});
+    const mR = line.match(/^R\s*[:|]\s*(.*)$/i);
+    const mL = line.match(/^L\s*[:|]\s*(.*)$/i);
+    if (mR){
+      let j = i + 1;
+      while (j < lines.length && !lines[j]) j++;
+      const mL2 = (j < lines.length) ? lines[j].match(/^L\s*[:|]\s*(.*)$/i) : null;
+      if (mL2){ blocks.push(buildBlock(tokenize(mR[1]), tokenize(mL2[1]))); i = j + 1; }
+      else    { blocks.push(buildBlock(tokenize(mR[1]), null)); i++; }
+    } else if (mL){
+      blocks.push(buildBlock(null, tokenize(mL[1]))); i++;
+    } else {
+      blocks.push(buildBlock(tokenize(line), null, true)); i++;   // legacy single line
     }
   }
   renderTrack();
@@ -359,32 +562,55 @@ function parseScore(text){
 
 /* --------------------------- Track display --------------------------- */
 const trackView = document.getElementById('trackView');
+
 function renderTrack(){
   trackView.innerHTML = '';
-  tokens.forEach((tk, i) => {
-    if (tk.type === 'label'){
+  for (const b of blocks){
+    if (b.label !== undefined){
       const s = document.createElement('span');
-      s.className = 'vlabel'; s.textContent = tk.text;
+      s.className = 'vlabel'; s.textContent = b.label;
       trackView.appendChild(s);
-    } else if (tk.type === 'bar'){
-      const s = document.createElement('span');
-      s.className = 'bar';
-      trackView.appendChild(s);
-    } else {
-      const s = document.createElement('span');
-      s.className = 'tok' + (tk.type === 'rest' ? ' rest' : '') + (tk.ding ? ' ding' : '');
-      s.textContent = tk.text;
-      s.dataset.event = tk.eventIdx;
-      s.title = '从这里播放';
-      s.addEventListener('click', () => startFrom(tk.eventIdx));
-      trackView.appendChild(s);
+      continue;
     }
-  });
+    const div = document.createElement('div');
+    div.className = 'block';
+    if (!b.single){
+      const tag = document.createElement('span');
+      tag.className = 'rowtag';
+      tag.innerHTML = '<span class="r">R</span><span class="l">L</span>';
+      div.appendChild(tag);
+    }
+    for (const c of b.cols){
+      if (c.bar){
+        const s = document.createElement('span');
+        s.className = 'barcol';
+        div.appendChild(s);
+        continue;
+      }
+      const col = document.createElement('span');
+      col.className = 'col';
+      col.dataset.event = c.evIdx;
+      col.title = '从这里播放';
+      const mk = (txt) => {
+        const s = document.createElement('span');
+        const t = (txt || '.');
+        s.className = 'cell' + (t === '.' ? ' rest' : '') +
+                      (/D/i.test(t) ? ' ding' : '');
+        s.textContent = t === '.' ? '·' : t;
+        return s;
+      };
+      col.appendChild(mk(b.single ? (c.rT || c.lT) : c.rT));
+      if (!b.single) col.appendChild(mk(c.lT));
+      col.addEventListener('click', () => startFrom(c.evIdx));
+      div.appendChild(col);
+    }
+    trackView.appendChild(div);
+  }
 }
 
 function highlightToken(evIdx){
-  trackView.querySelectorAll('.tok.now').forEach(n => n.classList.remove('now'));
-  const s = trackView.querySelector('.tok[data-event="' + evIdx + '"]');
+  trackView.querySelectorAll('.col.now').forEach(n => n.classList.remove('now'));
+  const s = trackView.querySelector('.col[data-event="' + evIdx + '"]');
   if (s){
     s.classList.add('now');
     const r = s.getBoundingClientRect(), box = trackView.getBoundingClientRect();
@@ -394,12 +620,11 @@ function highlightToken(evIdx){
 }
 
 /* ============================ Scheduler ============================== */
-/* Look-ahead scheduler: audio events queued 120 ms ahead on the audio
- * clock; a rAF loop drives visuals from the same timestamps.            */
 const LOOKAHEAD_S = 0.12, TIMER_MS = 25;
 let playing = false, pos = 0, nextTime = 0, timer = null;
-let visQueue = [];   // {time, evIdx}
+let visQueue = [];
 let stopAtTime = Infinity;
+let eighthCount = 0;
 
 const bpmSlider  = document.getElementById('bpm');
 const volSlider  = document.getElementById('vol');
@@ -407,14 +632,13 @@ const chkLoop    = document.getElementById('chkLoop');
 const chkMetro   = document.getElementById('chkMetro');
 const btnPlay    = document.getElementById('btnPlay');
 const statusEl   = document.getElementById('status');
-let eighthCount = 0;   // for metronome accents
 
-function eighthDur(){ return 30 / Number(bpmSlider.value); }  // 60/bpm/2
+function eighthDur(){ return 30 / Number(bpmSlider.value); }   // 60/bpm/2
 
 function scheduler(){
   while (playing && nextTime < actx.currentTime + LOOKAHEAD_S){
     const ev = events[pos];
-    for (const k of ev.keys) playHit(k, nextTime, 0.85);
+    for (const h of ev.hits) playHit(h.key, nextTime, 0.85);
     if (chkMetro.checked && eighthCount % 2 === 0)
       playTick(nextTime, eighthCount % 8 === 0);
     visQueue.push({time: nextTime, evIdx: pos});
@@ -434,8 +658,7 @@ function visLoop(){
   const now = actx.currentTime;
   while (visQueue.length && visQueue[0].time <= now + 0.005){
     const v = visQueue.shift();
-    const ev = events[v.evIdx];
-    for (const k of ev.keys) flashPad(k);
+    for (const h of events[v.evIdx].hits) flashPad(h.key, h.hand);
     highlightToken(v.evIdx);
   }
   requestAnimationFrame(visLoop);
@@ -454,6 +677,7 @@ function startFrom(evIdx){
   timer = setInterval(scheduler, TIMER_MS);
   requestAnimationFrame(visLoop);
   btnPlay.textContent = '⏸ 暂停';
+  statusEl.className = 'status';
   statusEl.textContent = '播放中 · ' + bpmSlider.value + ' BPM';
 }
 
@@ -463,15 +687,12 @@ function stopPlay(silent){
   visQueue = [];
   stopAtTime = Infinity;
   btnPlay.textContent = '▶ 播放';
-  trackView.querySelectorAll('.tok.now').forEach(n => n.classList.remove('now'));
-  if (!silent) statusEl.textContent = '已停止';
+  trackView.querySelectorAll('.col.now').forEach(n => n.classList.remove('now'));
+  if (!silent){ statusEl.className = 'status'; statusEl.textContent = '已停止'; }
 }
 
 /* ============================ Wire up UI ============================= */
-btnPlay.addEventListener('click', () => {
-  if (playing) stopPlay();
-  else startFrom(0);
-});
+btnPlay.addEventListener('click', () => { playing ? stopPlay() : startFrom(0); });
 document.getElementById('btnStop').addEventListener('click', () => stopPlay());
 
 bpmSlider.addEventListener('input', () => {
@@ -484,19 +705,264 @@ volSlider.addEventListener('input', () => {
 });
 
 const scoreText = document.getElementById('scoreText');
-document.getElementById('btnApply').addEventListener('click', () => {
+function applyScore(msg){
   stopPlay(true);
   parseScore(scoreText.value);
-  statusEl.textContent = '乐谱已应用：共 ' + events.length + ' 个八分音符。';
-});
+  if (parseWarnings.length){
+    statusEl.className = 'status warn';
+    statusEl.textContent = '⚠ ' + parseWarnings.join('；');
+  } else {
+    statusEl.className = 'status';
+    statusEl.textContent = (msg || '乐谱已应用') + '：共 ' + events.length + ' 个八分音符。';
+  }
+}
+document.getElementById('btnApply').addEventListener('click', () => applyScore());
 document.getElementById('btnReset').addEventListener('click', () => {
-  stopPlay(true);
   scoreText.value = DEFAULT_SCORE;
-  parseScore(DEFAULT_SCORE);
-  statusEl.textContent = '已恢复 Pocket Groove 11。';
+  applyScore('已恢复 Pocket Groove 11');
 });
 
-/* Space bar toggles playback when not typing in the textarea */
+/* ==================== PDF score recognition ========================== */
+/* Notepan-style vector PDFs carry a text layer where every note label
+ * (D / T / S / 1-8) is a glyph with (x, y) coordinates. Recognition is
+ * pure geometry — no ML involved:
+ *   1. keep single-char note tokens, cluster them into rows by y
+ *   2. rows with >= MIN_ROW_TOKENS items are score rows; junk (titles,
+ *      measure numbers, layout-page labels) falls below the threshold
+ *   3. two adjacent rows = one system: upper row -> R, lower row -> L
+ *   4. quantize x onto the 8th-note grid (grid step = smallest x gap);
+ *      empty slots become rests
+ * Fails only on scanned/rasterized PDFs, which have no text layer.      */
+const PDFJS_URL    = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const TOKEN_RE = /^(D|T|S|[1-8])$/i;   // case-insensitive: some glyph variants render lowercase
+const MIN_ROW_TOKENS = 3;   // rows with fewer tokens are treated as junk
+const ROW_Y_TOL = 4;        // y tolerance when clustering tokens into a row
+const SYSTEM_GAP = 45;      // max y gap between the R and L rows of one system
+
+function loadPdfJs(){
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = PDFJS_URL;
+    s.onload = () => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+      res(window.pdfjsLib);
+    };
+    s.onerror = () => rej(new Error('pdf.js 加载失败（首次使用需联网）'));
+    document.head.appendChild(s);
+  });
+}
+
+function clusterRows(items){
+  const rows = [];
+  for (const it of items.slice().sort((a, b) => a.y - b.y)){   // top of page first (viewport y grows downward)
+    const r = rows.find(r => Math.abs(r.y - it.y) <= ROW_Y_TOL);
+    if (r) r.items.push(it); else rows.push({y: it.y, items: [it]});
+  }
+  return rows;   // junk filtering happens in recognizePdf, once noteMinX is known
+}
+
+// Fallback for systems too sparse to quantize into columns (0-1 real columns):
+// still keep the R:/L: split when both hands are present, same as the normal path.
+function sparseFallback(top, bottom, all){
+  if (top && bottom) return ['R: ' + top.items.map(i => i.str).join(' '),
+                             'L: ' + bottom.items.map(i => i.str).join(' ')];
+  return [all.map(i => i.str).join(' ')];
+}
+
+/* Column quantization: cluster raw x's into columns first (tolerant of the
+ * sub-pixel glyph-origin jitter between different characters landing in the
+ * same musical slot, e.g. 'D' vs '4' at a simultaneous hit), then walk
+ * columns incrementally — each column's slot index is the previous column's
+ * plus round(localGap / step) — instead of round((x - x0) / step) from one
+ * fixed origin. The latter compounds a few % of step error linearly over a
+ * row's length and silently drifts a whole slot by column ~15-20; the
+ * incremental form only ever rounds a small local ratio, so it doesn't. */
+function systemToLines(top, bottom){
+  const all = [...(top ? top.items : []), ...(bottom ? bottom.items : [])];
+  if (all.length < 2) return sparseFallback(top, bottom, all);
+  const COL_TOL = 6;
+  const sortedX = all.map(it => it.x).sort((a, b) => a - b);
+  const cols = [];
+  for (const x of sortedX){
+    const c = cols[cols.length - 1];
+    if (c && x - c.x < COL_TOL) c.x = (c.x * c.n + x) / ++c.n;
+    else cols.push({x, n: 1});
+  }
+  if (cols.length < 2) return sparseFallback(top, bottom, all);
+  const gaps = [];
+  for (let i = 1; i < cols.length; i++) gaps.push(cols[i].x - cols[i-1].x);
+  const minGap = Math.min(...gaps);
+  const unitGaps = gaps.filter(g => g <= minGap * 1.5).sort((a, b) => a - b);
+  const step = unitGaps[Math.floor(unitGaps.length / 2)];   // median of the smallest-gap cluster
+  if (!isFinite(step) || step <= 0) return [];
+  const colSlot = [0];
+  for (let i = 1; i < cols.length; i++)
+    colSlot.push(colSlot[i - 1] + Math.max(1, Math.round(gaps[i - 1] / step)));
+  // one past the last visible glyph; if that's odd, the phrase almost certainly
+  // ends on an invisible trailing rest (this style's phrases end on even slots)
+  let nSlots = colSlot[colSlot.length - 1] + 1;
+  if (nSlots % 2 === 1) nSlots++;
+  if (nSlots > 256) return [];
+  const slotOf = x => {
+    let lo = 0, hi = cols.length - 1;
+    while (lo < hi){
+      const mid = (lo + hi) >> 1;
+      if (cols[mid].x < x) lo = mid + 1; else hi = mid;
+    }
+    if (lo > 0 && Math.abs(cols[lo - 1].x - x) < Math.abs(cols[lo].x - x)) lo--;
+    return colSlot[lo];
+  };
+  const toRow = row => {
+    const arr = Array(nSlots).fill('.');
+    if (row) for (const it of row.items){
+      const s = slotOf(it.x);
+      arr[s] = (arr[s] === '.') ? it.str : arr[s] + '+' + it.str;
+    }
+    // barline every 8 slots for readability (assumes 4/4, cosmetic only)
+    return arr.flatMap((t, i) => (i > 0 && i % 8 === 0) ? ['|', t] : [t]).join(' ');
+  };
+  if (top && bottom) return ['R: ' + toRow(top), 'L: ' + toRow(bottom)];
+  return [toRow(top || bottom)];
+}
+
+async function recognizePdf(file){
+  const lib = await loadPdfJs();
+  const doc = await lib.getDocument({data: await file.arrayBuffer()}).promise;
+  const out = ['# 从 PDF 识别：' + file.name + '（请核对节奏与左右手）'];
+  let systems = 0;
+  for (let p = 1; p <= doc.numPages; p++){
+    const page = await doc.getPage(p);
+    const viewport = page.getViewport({scale: 1});   // accounts for the page's /Rotate entry
+    const tc = await page.getTextContent();
+    const items = tc.items
+      .map(it => {
+        const tx = lib.Util.transform(viewport.transform, it.transform);
+        return {str: it.str.trim().toUpperCase(), x: tx[4], y: tx[5]};
+      })
+      .filter(it => TOKEN_RE.test(it.str));
+    const rows = clusterRows(items);
+    // A row below MIN_ROW_TOKENS is normally junk (page-number stamps, the pad-diagram
+    // labels scattered around the cover page's circle) — but a short *real* final
+    // phrase (e.g. a single closing note) is just as sparse. Junk margin labels sit at
+    // x well left of the real note grid, so use the leftmost x seen among rows that
+    // already qualify on their own as the cutoff for rescuing sparse-but-real rows.
+    const noteMinX = Math.min(...rows.filter(r => r.items.length >= MIN_ROW_TOKENS)
+                                      .flatMap(r => r.items.map(it => it.x)));
+    const realRows = rows.filter(r => r.items.length >= MIN_ROW_TOKENS ||
+      (isFinite(noteMinX) && r.items.every(it => it.x >= noteMinX)));
+    let pageMarked = false;
+    let i = 0;
+    while (i < realRows.length){
+      const top = realRows[i];
+      const bottom = (i + 1 < realRows.length && (realRows[i + 1].y - top.y) <= SYSTEM_GAP)
+                     ? realRows[i + 1] : null;
+      const lines = systemToLines(top, bottom);
+      if (lines.length){
+        if (!pageMarked){ out.push('# 第 ' + p + ' 页'); pageMarked = true; }
+        out.push(...lines, '');
+        systems++;
+      }
+      i += bottom ? 2 : 1;
+    }
+  }
+  if (!systems)
+    throw new Error('未在 PDF 文本层找到乐谱记号——扫描件或纯图形谱需要 OCR/视觉模型');
+  return out.join('\n');
+}
+
+const pdfFile = document.getElementById('pdfFile');
+document.getElementById('btnPdf').addEventListener('click', () => pdfFile.click());
+pdfFile.addEventListener('change', async () => {
+  const f = pdfFile.files[0];
+  if (!f) return;
+  statusEl.className = 'status';
+  statusEl.textContent = '正在识别 PDF…';
+  try {
+    scoreText.value = await recognizePdf(f);
+    applyScore('PDF 识别完成');
+  } catch (err){
+    statusEl.className = 'status warn';
+    statusEl.textContent = '⚠ ' + err.message;
+  }
+  pdfFile.value = '';
+});
+
+/* ==================== Save / load scores ============================= */
+// Plain-text export/import: works everywhere, survives browser resets.
+document.getElementById('btnExport').addEventListener('click', () => {
+  const blob = new Blob([scoreText.value], {type: 'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'handpan-score-' + new Date().toISOString().slice(0, 10) + '.txt';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+const txtFile = document.getElementById('txtFile');
+document.getElementById('btnImport').addEventListener('click', () => txtFile.click());
+txtFile.addEventListener('change', () => {
+  const f = txtFile.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => { scoreText.value = rd.result; applyScore('已导入 ' + f.name); };
+  rd.readAsText(f);
+  txtFile.value = '';
+});
+
+// In-browser library (localStorage). Unavailable in sandboxed previews /
+// private mode — the row hides itself and txt export remains the fallback.
+const LIB_KEY = 'handpan_scores_v1';
+function libStore(){
+  try {
+    localStorage.setItem('__probe', '1');
+    localStorage.removeItem('__probe');
+    return localStorage;
+  } catch (e){ return null; }
+}
+function libRead(){
+  const s = libStore();
+  if (!s) return {};
+  try { return JSON.parse(s.getItem(LIB_KEY) || '{}'); } catch (e){ return {}; }
+}
+function libWrite(obj){ const s = libStore(); if (s) s.setItem(LIB_KEY, JSON.stringify(obj)); }
+
+const libRow = document.getElementById('libRow');
+const libSel = document.getElementById('libSel');
+function refreshLib(){
+  if (!libStore()){ libRow.style.display = 'none'; return; }
+  const names = Object.keys(libRead()).sort();
+  libSel.innerHTML = names.length
+    ? names.map(n => '<option>' + n.replace(/</g, '&lt;') + '</option>').join('')
+    : '<option value="" disabled selected>（曲库为空）</option>';
+}
+document.getElementById('btnLibSave').addEventListener('click', () => {
+  const name = prompt('曲目名称：', 'Pocket Groove 11');
+  if (!name) return;
+  const lib = libRead();
+  lib[name] = scoreText.value;
+  libWrite(lib);
+  refreshLib();
+  libSel.value = name;
+  statusEl.className = 'status';
+  statusEl.textContent = '已存入曲库：' + name;
+});
+document.getElementById('btnLibLoad').addEventListener('click', () => {
+  const lib = libRead(), name = libSel.value;
+  if (!name || !(name in lib)) return;
+  scoreText.value = lib[name];
+  applyScore('已载入「' + name + '」');
+});
+document.getElementById('btnLibDel').addEventListener('click', () => {
+  const name = libSel.value;
+  if (!name || !confirm('删除「' + name + '」？')) return;
+  const lib = libRead();
+  delete lib[name];
+  libWrite(lib);
+  refreshLib();
+});
+refreshLib();
+
 document.addEventListener('keydown', e => {
   if (e.code === 'Space' && document.activeElement !== scoreText &&
       document.activeElement.tagName !== 'BUTTON'){

@@ -1,0 +1,32 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="75%">
+      <stop offset="0%" stop-color="#1c242c"/>
+      <stop offset="60%" stop-color="#171d23"/>
+      <stop offset="100%" stop-color="#0f1317"/>
+    </radialGradient>
+    <radialGradient id="shell" cx="38%" cy="32%" r="85%">
+      <stop offset="0%" stop-color="#414e59"/>
+      <stop offset="55%" stop-color="#2c3742"/>
+      <stop offset="100%" stop-color="#1b232b"/>
+    </radialGradient>
+    <radialGradient id="pad" cx="40%" cy="35%" r="80%">
+      <stop offset="0%" stop-color="#f4f2ec"/>
+      <stop offset="100%" stop-color="#d5d3ca"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <!-- shell -->
+  <circle cx="512" cy="512" r="430" fill="url(#shell)" stroke="#465360" stroke-width="8"/>
+  <!-- tone-field pads, alternating right (brass) / left (steel-blue) hand -->
+  <circle cx="512" cy="226" r="88" fill="#d8a45c" stroke="#10151a" stroke-width="6"/>
+  <circle cx="760" cy="369" r="88" fill="#8fc7e8" stroke="#10151a" stroke-width="6"/>
+  <circle cx="760" cy="655" r="88" fill="#d8a45c" stroke="#10151a" stroke-width="6"/>
+  <circle cx="512" cy="798" r="88" fill="#8fc7e8" stroke="#10151a" stroke-width="6"/>
+  <circle cx="264" cy="655" r="88" fill="#d8a45c" stroke="#10151a" stroke-width="6"/>
+  <circle cx="264" cy="369" r="88" fill="#8fc7e8" stroke="#10151a" stroke-width="6"/>
+  <!-- T shoulder ring -->
+  <circle cx="512" cy="512" r="163" fill="none" stroke="#4a5763" stroke-width="30"/>
+  <!-- Ding -->
+  <circle cx="512" cy="512" r="118" fill="url(#pad)" stroke="#10151a" stroke-width="6"/>
+</svg>

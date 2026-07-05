@@ -1,0 +1,48 @@
+workflows:
+  ios-handpan:
+    name: 智慧手碟 iOS
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      # Name must match the App Store Connect API key integration you create
+      # in Codemagic team settings (see ios-app/README.md step 3-4).
+      app_store_connect: codemagic_ios_key
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.handpan.player
+      node: 22
+      vars:
+        XCODE_WORKSPACE: "ios-app/ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+    scripts:
+      - name: Copy web app into ios-app/www
+        script: |
+          cp handpan-player.html ios-app/www/index.html
+      - name: Install npm dependencies
+        script: |
+          cd ios-app && npm ci
+      - name: Add iOS platform (regenerated fresh on every build — see ios-app/README.md)
+        script: |
+          cd ios-app && npx cap add ios
+      - name: Generate app icons from assets/
+        script: |
+          cd ios-app && npx capacitor-assets generate --ios
+      - name: Sync web assets and install CocoaPods dependencies
+        script: |
+          cd ios-app && npx cap sync ios
+      - name: Set up code signing
+        script: |
+          xcode-project use-profiles
+      - name: Build .ipa
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - ios-app/ios/App/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

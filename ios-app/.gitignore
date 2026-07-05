@@ -1,0 +1,8 @@
+node_modules/
+*.ipa
+# the native Xcode project is never committed — it depends on macOS/CocoaPods
+# tooling that can't run on this machine, so it's regenerated fresh on every
+# Codemagic build via `npx cap add ios` (see README.md)
+ios/
+# generated copy of ../handpan-player.html (see README's rebuild steps) — not source
+www/index.html

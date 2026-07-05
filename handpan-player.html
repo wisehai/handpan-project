@@ -392,7 +392,13 @@ function store(){
   } catch (e){ return null; }
 }
 
-let lang = (store() && store().getItem('handpan_lang')) || 'en';
+function detectLang(){
+  const saved = store() && store().getItem('handpan_lang');
+  if (saved) return saved;
+  const langs = navigator.languages || [navigator.language || ''];
+  return langs.some(l => l && l.toLowerCase().startsWith('zh')) ? 'zh' : 'en';
+}
+let lang = detectLang();
 
 function tr(key, ...args){
   const v = (I18N[lang] && I18N[lang][key]) ?? I18N.en[key] ?? key;

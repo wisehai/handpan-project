@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>智慧手碟</title>
+<title>Wise Handpan · 知音手碟</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0f1317">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="智慧手碟">
+<meta name="apple-mobile-web-app-title" content="知音手碟">
 <script>
   if ('serviceWorker' in navigator){
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
@@ -132,45 +132,67 @@
   .rowtag .l{color:var(--lblue);}
   .status{font-size:12px;color:var(--muted);margin-top:8px;min-height:16px;}
   .status.warn{color:#e0b45f;}
+
+  /* ---------- Lang toggle / collapsible editor / library icons -------- */
+  .lang{padding:5px 12px;border-radius:999px;font-size:12px;}
+  #editWrap{margin-top:10px;}
+  #editWrap summary{cursor:pointer;color:var(--muted);font-size:13px;letter-spacing:.05em;
+    padding:4px 0;user-select:none;}
+  #editWrap summary:hover{color:var(--ink);}
+  #editWrap[open] summary{margin-bottom:8px;}
+  button.icon{padding:9px 12px;min-width:42px;text-align:center;}
+  button.icon.armed{background:#7e3a3a;border-color:#a04848;color:#ffd9d9;}
+  button.icon:disabled{opacity:.35;cursor:default;}
+  input[type=text]{font:inherit;background:#12171c;color:var(--ink);border:1px solid var(--line);
+    border-radius:9px;padding:8px 10px;flex:1;min-width:120px;}
+  input[type=text]:focus-visible{outline:2px solid var(--brass);outline-offset:1px;}
+  dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);
+    border-radius:14px;padding:20px;min-width:min(320px,86vw);}
+  dialog::backdrop{background:rgba(6,9,12,.6);backdrop-filter:blur(2px);}
+  dialog h3{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.16em;
+    text-transform:uppercase;margin-bottom:12px;}
+  dialog input[type=text]{width:100%;}
+  .dlg-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>智慧手碟 <em>Handpan</em></h1>
-    <span class="sub">你的练习搭子</span>
-    <span class="scale-tag">音阶：D Kurd 8+1 &nbsp;·&nbsp; D3 / A3 Bb3 C4 D4 E4 F4 G4 A4</span>
+    <h1 data-i18n="title">Wise <em>Handpan</em></h1>
+    <span class="sub" data-i18n="subtitle">Your practice partner</span>
+    <span class="scale-tag" data-i18n="scaleTag">Scale: D Kurd 8+1 · D3 / A3 Bb3 C4 D4 E4 F4 G4 A4</span>
+    <button id="langBtn" class="lang" aria-label="Switch language / 切换语言">中</button>
   </header>
 
   <div class="grid">
     <!-- ================= Left: pan + transport ================= -->
     <div class="card">
-      <h2>手碟 · 点击音区 / T 环 / 碟面空白处可试听</h2>
+      <h2 data-i18n="panTitle">Handpan · tap a pad / T ring / shell to preview</h2>
       <div id="panBox">
-        <svg id="pan" viewBox="0 0 500 500" role="img" aria-label="手碟布局图"></svg>
+        <svg id="pan" viewBox="0 0 500 500" role="img" data-i18n-aria="ariaPan" aria-label="Handpan layout"></svg>
       </div>
       <div class="legend">
-        <span><span class="dot" style="background:var(--brass)"></span>右手 R</span>
-        <span><span class="dot" style="background:var(--lblue)"></span>左手 L</span>
-        <span>T = 肩音（Ding 外圈）</span>
-        <span>S = Slap（碟面）</span>
+        <span><span class="dot" style="background:var(--brass)"></span><span data-i18n="legendR">Right hand R</span></span>
+        <span><span class="dot" style="background:var(--lblue)"></span><span data-i18n="legendL">Left hand L</span></span>
+        <span data-i18n="legendT">T = shoulder (ring around Ding)</span>
+        <span data-i18n="legendS">S = slap (shell)</span>
       </div>
 
       <div class="transport">
-        <button class="primary" id="btnPlay">▶ 播放</button>
-        <button id="btnStop">■ 停止</button>
-        <label class="chk"><input type="checkbox" id="chkLoop">循环</label>
-        <label class="chk"><input type="checkbox" id="chkMetro">节拍器</label>
+        <button class="primary" id="btnPlay" data-i18n="play">▶ Play</button>
+        <button id="btnStop" data-i18n="stop">■ Stop</button>
+        <label class="chk"><input type="checkbox" id="chkLoop"><span data-i18n="loop">Loop</span></label>
+        <label class="chk"><input type="checkbox" id="chkMetro"><span data-i18n="metro">Metronome</span></label>
       </div>
 
       <div class="sliders">
         <div class="slider-row">
-          <span>速度 BPM</span>
+          <span data-i18n="bpmLabel">Tempo BPM</span>
           <input type="range" id="bpm" min="50" max="200" value="110" step="1">
           <output id="bpmVal">110</output>
         </div>
         <div class="slider-row">
-          <span>音量</span>
+          <span data-i18n="volLabel">Volume</span>
           <input type="range" id="vol" min="0" max="100" value="75" step="1">
           <output id="volVal">75%</output>
         </div>
@@ -180,31 +202,31 @@
 
     <!-- ================= Right: score ================= -->
     <div class="card">
-      <h2>乐谱（可编辑 · 双行记法）</h2>
-      <textarea id="scoreText" spellcheck="false" wrap="off"></textarea>
-      <div class="score-actions">
-        <button id="btnApply">应用乐谱</button>
-        <button id="btnReset">恢复 Pocket Groove 11</button>
-        <button id="btnPdf">导入 PDF 识谱</button>
-        <button id="btnExport">导出 .txt</button>
-        <button id="btnImport">导入 .txt</button>
-      </div>
+      <h2 data-i18n="scoreTitle">Score</h2>
       <div class="score-actions" id="libRow">
-        <select id="libSel" aria-label="曲库"></select>
-        <button id="btnLibSave">存入曲库</button>
-        <button id="btnLibLoad">载入</button>
-        <button id="btnLibDel">删除</button>
+        <select id="libSel" data-i18n-aria="libAria" aria-label="Score library"></select>
+        <button id="btnLibSave" class="icon" data-i18n-title="saveTip" title="Save current score to library">＋</button>
+        <button id="btnLibDel" class="icon" data-i18n-title="delTip" title="Delete selected score">✕</button>
+        <button id="btnPdf" class="icon" data-i18n="pdfBtn" data-i18n-title="pdfTip" title="Import a PDF score">PDF</button>
       </div>
+      <dialog id="saveDlg">
+        <h3 data-i18n="saveTitle">Save to library</h3>
+        <input type="text" id="saveName" maxlength="60" autocomplete="off"
+               data-i18n-ph="savePh" placeholder="Score name">
+        <div class="dlg-actions">
+          <button id="btnSaveCancel" data-i18n="saveCancel">Cancel</button>
+          <button id="btnSaveOk" class="primary" data-i18n="saveOk">Save</button>
+        </div>
+      </dialog>
+      <details id="editWrap">
+        <summary data-i18n="editScore">Edit score (two-row notation)</summary>
+        <textarea id="scoreText" spellcheck="false" wrap="off"></textarea>
+        <div class="score-actions">
+          <button id="btnApply" data-i18n="apply">Apply</button>
+        </div>
+        <div class="hint" data-i18n="hint"></div>
+      </details>
       <input type="file" id="pdfFile" accept="application/pdf" hidden>
-      <input type="file" id="txtFile" accept=".txt,text/plain" hidden>
-      <div class="hint">
-        <code>R:</code> 行是右手、紧跟的 <code>L:</code> 行是左手，按列对齐，每列一个八分音符；
-        两行同列都有音 = 双手同击。
-        记号：<code>D</code> Ding，<code>1</code>–<code>8</code> 音区，
-        <code>T</code> 肩音，<code>S</code> Slap，<code>.</code> 休止，
-        <code>|</code> 小节线（仅显示），<code>#</code> 注释行。
-        也兼容单行记法（不区分左右手）。点击下方任意列可从该处播放。
-      </div>
       <div id="trackView"></div>
     </div>
   </div>
@@ -217,6 +239,147 @@
  * Two-row (R/L hand) score, T shoulder tone, S slap,
  * Web Audio synthesis + SVG visualization
  * ===================================================================== */
+
+/* ============================ i18n =================================== */
+/* All UI strings live here; static DOM nodes carry data-i18n* attributes
+ * and are re-painted by setLang(); dynamic messages go through tr().
+ * Dict values are plain strings, HTML snippets, or (args)=>string fns.   */
+const I18N = {
+  en: {
+    title:      'Wise <em>Handpan</em>',
+    subtitle:   'Your practice partner',
+    scaleTag:   'Scale: D Kurd 8+1 · D3 / A3 Bb3 C4 D4 E4 F4 G4 A4',
+    panTitle:   'Handpan · tap a pad / T ring / shell to preview',
+    legendR:    'Right hand R',
+    legendL:    'Left hand L',
+    legendT:    'T = shoulder (ring around Ding)',
+    legendS:    'S = slap (shell)',
+    play:       '▶ Play',
+    pause:      '⏸ Pause',
+    stop:       '■ Stop',
+    loop:       'Loop',
+    metro:      'Metronome',
+    bpmLabel:   'Tempo BPM',
+    volLabel:   'Volume',
+    scoreTitle: 'Score',
+    editScore:  'Edit score (two-row notation)',
+    apply:      'Apply',
+    pdfBtn:     'PDF',
+    pdfTip:     'Import a PDF score',
+    saveTitle:  'Save to library',
+    saveTip:    'Save current score to library',
+    delTip:     'Delete selected score',
+    libAria:    'Score library',
+    savePh:     'Score name',
+    saveOk:     'Save',
+    saveCancel: 'Cancel',
+    sure:       'Sure?',
+    builtinGroup: 'Built-in',
+    userGroup:  'My scores',
+    hint: 'The <code>R:</code> line is the right hand and the <code>L:</code> line right below it is the left; ' +
+          'columns align, one column per eighth note; notes in both rows of the same column = both hands together. ' +
+          'Tokens: <code>D</code> Ding, <code>1</code>–<code>8</code> tone fields, <code>T</code> shoulder, ' +
+          '<code>S</code> slap, <code>.</code> rest, <code>|</code> barline (display only), <code>#</code> comment line. ' +
+          'Single-line notation (no hand info) also works. Click any column below to play from there.',
+    playFromHere: 'Play from here',
+    emptyScore: 'Score is empty — enter some tokens first.',
+    playingAt:  bpm => 'Playing · ' + bpm + ' BPM',
+    stopped:    'Stopped',
+    slotCount:  n => n + ' eighth-note slots',
+    rlMismatch: (r, l) => 'R/L column counts differ in a block (R=' + r + ', L=' + l + '); the shorter row is padded with rests',
+    loaded:     n => 'Loaded "' + n + '"',
+    saved:      n => 'Saved to library: ' + n,
+    deleted:    n => 'Deleted "' + n + '"',
+    dirtyConfirm: 'The editor has unsaved changes. Discard them and switch?',
+    pdfLoading: 'Recognizing PDF…',
+    pdfDone:    'PDF recognized',
+    pdfJsFail:  'Failed to load pdf.js (network required on first use)',
+    pdfNoScore: 'No score tokens found in the PDF text layer — scanned or graphics-only scores need OCR / a vision model',
+    pdfHeader:  n => '# Recognized from PDF: ' + n + ' (verify rhythm & hands)',
+    pdfPage:    p => '# Page ' + p,
+    ariaPan:    'Handpan layout',
+    ariaSlap:   'Slap (shell)',
+    ariaT:      'Shoulder tone T',
+    ariaPad:    k => 'Pad ' + k,
+  },
+  zh: {
+    title:      '知音手碟 <em>Handpan</em>',
+    subtitle:   '你的练习搭子',
+    scaleTag:   '音阶：D Kurd 8+1 · D3 / A3 Bb3 C4 D4 E4 F4 G4 A4',
+    panTitle:   '手碟 · 点击音区 / T 环 / 碟面空白处可试听',
+    legendR:    '右手 R',
+    legendL:    '左手 L',
+    legendT:    'T = 肩音（Ding 外圈）',
+    legendS:    'S = Slap（碟面）',
+    play:       '▶ 播放',
+    pause:      '⏸ 暂停',
+    stop:       '■ 停止',
+    loop:       '循环',
+    metro:      '节拍器',
+    bpmLabel:   '速度 BPM',
+    volLabel:   '音量',
+    scoreTitle: '乐谱',
+    editScore:  '编辑乐谱（双行记法）',
+    apply:      '应用乐谱',
+    pdfBtn:     'PDF',
+    pdfTip:     '导入 PDF 识谱',
+    saveTitle:  '存入曲库',
+    saveTip:    '把当前谱存入曲库',
+    delTip:     '删除选中曲目',
+    libAria:    '曲库',
+    savePh:     '曲目名称',
+    saveOk:     '保存',
+    saveCancel: '取消',
+    sure:       '确认?',
+    builtinGroup: '内置',
+    userGroup:  '我的曲子',
+    hint: '<code>R:</code> 行是右手、紧跟的 <code>L:</code> 行是左手，按列对齐，每列一个八分音符；' +
+          '两行同列都有音 = 双手同击。记号：<code>D</code> Ding，<code>1</code>–<code>8</code> 音区，' +
+          '<code>T</code> 肩音，<code>S</code> Slap，<code>.</code> 休止，' +
+          '<code>|</code> 小节线（仅显示），<code>#</code> 注释行。' +
+          '也兼容单行记法（不区分左右手）。点击下方任意列可从该处播放。',
+    playFromHere: '从这里播放',
+    emptyScore: '乐谱为空，请先输入记号。',
+    playingAt:  bpm => '播放中 · ' + bpm + ' BPM',
+    stopped:    '已停止',
+    slotCount:  n => '共 ' + n + ' 个八分音符',
+    rlMismatch: (r, l) => '某组 R/L 列数不一致（R=' + r + '，L=' + l + '），短的一行按休止补齐',
+    loaded:     n => '已载入「' + n + '」',
+    saved:      n => '已存入曲库：' + n,
+    deleted:    n => '已删除「' + n + '」',
+    dirtyConfirm: '编辑区有未保存的改动，切换将丢弃这些改动，继续？',
+    pdfLoading: '正在识别 PDF…',
+    pdfDone:    'PDF 识别完成',
+    pdfJsFail:  'pdf.js 加载失败（首次使用需联网）',
+    pdfNoScore: '未在 PDF 文本层找到乐谱记号——扫描件或纯图形谱需要 OCR/视觉模型',
+    pdfHeader:  n => '# 从 PDF 识别：' + n + '（请核对节奏与左右手）',
+    pdfPage:    p => '# 第 ' + p + ' 页',
+    ariaPan:    '手碟布局图',
+    ariaSlap:   'Slap（碟面拍击）',
+    ariaT:      '肩音 T',
+    ariaPad:    k => '音区 ' + k,
+  },
+};
+
+// Guarded localStorage: returns null in sandboxed previews / private mode.
+function store(){
+  try {
+    localStorage.setItem('__probe', '1');
+    localStorage.removeItem('__probe');
+    return localStorage;
+  } catch (e){ return null; }
+}
+
+let lang = (store() && store().getItem('handpan_lang')) || 'en';
+
+function tr(key, ...args){
+  const v = (I18N[lang] && I18N[lang][key]) ?? I18N.en[key] ?? key;
+  return (typeof v === 'function') ? v(...args) : v;
+}
+
+function safeConfirm(msg){
+  try { return window.confirm(msg); } catch (e){ return true; }
+}
 
 /* ---------- Note table (name, frequency, ring angle from top, CW) ---- */
 const NOTES = {
@@ -290,7 +453,7 @@ L: 6 . . 6 . . 6 . | . 6 . . 6 . . .
 R: D . 1 . D . 1 . | D . 1 . T . D .
 L: 4 . . 4 . . 4 . | . 4 . D . . . .
 
-# 结尾
+# Ending
 R: D
 L: 4`;
 
@@ -320,7 +483,7 @@ function buildPan(){
   // shell — clicking empty shell area previews a slap
   const shell = el('circle', {id:'shell', cx:CX, cy:CY, r:228, fill:'url(#shellg)',
     stroke:'#465360', 'stroke-width':2, tabindex:0, role:'button',
-    'aria-label':'Slap（碟面拍击）'}, pan);
+    'aria-label':tr('ariaSlap')}, pan);
   el('circle', {cx:CX, cy:CY, r:214, fill:'none', stroke:'#161d24',
     'stroke-width':1.5, opacity:.7, 'pointer-events':'none'}, pan);
   const slapTrig = e => { e.preventDefault(); ensureCtx(); playEventNow([{key:'S', hand:null}]); };
@@ -330,7 +493,7 @@ function buildPan(){
   // T shoulder ring around the ding
   const tRing = el('circle', {id:'tRing', cx:CX, cy:CY, r:T_R, fill:'none',
     stroke:'#4a5763', 'stroke-width':13, 'pointer-events':'stroke',
-    tabindex:0, role:'button', 'aria-label':'肩音 T'}, pan);
+    tabindex:0, role:'button', 'aria-label':tr('ariaT')}, pan);
   el('text', {x:CX + (T_R+16)*Math.SQRT1_2, y:CY - (T_R+13)*Math.SQRT1_2,
     class:'pad-num', 'text-anchor':'middle', 'pointer-events':'none'}, pan)
     .textContent = 'T';
@@ -342,7 +505,7 @@ function buildPan(){
 
   const makePad = (key, cx, cy, r) => {
     const g = el('g', {class:'pad-circle', tabindex:0, role:'button',
-                       'aria-label':'音区 ' + key}, pan);
+                       'aria-label':tr('ariaPad', key)}, pan);
     el('circle', {class:'pad-fill', cx, cy, r, fill:'url(#padg)',
                   stroke:'#10151a', 'stroke-width':2}, g);
     const n = NOTES[key];
@@ -541,7 +704,7 @@ function buildBlock(rToks, lToks, legacy){
   const lEv = lToks ? lToks.filter(t => t !== '|') : null;
   const nR = rEv ? rEv.length : 0, nL = lEv ? lEv.length : 0;
   if (rEv && lEv && nR !== nL)
-    parseWarnings.push('某组 R/L 列数不一致（R=' + nR + '，L=' + nL + '），短的一行按休止补齐');
+    parseWarnings.push(tr('rlMismatch', nR, nL));
   const n = Math.max(nR, nL);
   const guide = rToks || lToks;          // bar positions taken from this row
   const cols = [];
@@ -613,7 +776,7 @@ function renderTrack(){
       const col = document.createElement('span');
       col.className = 'col';
       col.dataset.event = c.evIdx;
-      col.title = '从这里播放';
+      col.title = tr('playFromHere');
       const mk = (txt) => {
         const s = document.createElement('span');
         const t = (txt || '.');
@@ -691,7 +854,7 @@ function visLoop(){
 }
 
 function startFrom(evIdx){
-  if (events.length === 0){ statusEl.textContent = '乐谱为空，请先输入记号。'; return; }
+  if (events.length === 0){ statusEl.textContent = tr('emptyScore'); return; }
   ensureCtx();
   stopPlay(true);
   playing = true;
@@ -702,9 +865,9 @@ function startFrom(evIdx){
   visQueue = [];
   timer = setInterval(scheduler, TIMER_MS);
   requestAnimationFrame(visLoop);
-  btnPlay.textContent = '⏸ 暂停';
+  btnPlay.textContent = tr('pause');
   statusEl.className = 'status';
-  statusEl.textContent = '播放中 · ' + bpmSlider.value + ' BPM';
+  statusEl.textContent = tr('playingAt', bpmSlider.value);
 }
 
 function stopPlay(silent){
@@ -712,9 +875,9 @@ function stopPlay(silent){
   if (timer){ clearInterval(timer); timer = null; }
   visQueue = [];
   stopAtTime = Infinity;
-  btnPlay.textContent = '▶ 播放';
+  btnPlay.textContent = tr('play');
   trackView.querySelectorAll('.col.now').forEach(n => n.classList.remove('now'));
-  if (!silent){ statusEl.className = 'status'; statusEl.textContent = '已停止'; }
+  if (!silent){ statusEl.className = 'status'; statusEl.textContent = tr('stopped'); }
 }
 
 /* ============================ Wire up UI ============================= */
@@ -723,7 +886,7 @@ document.getElementById('btnStop').addEventListener('click', () => stopPlay());
 
 bpmSlider.addEventListener('input', () => {
   document.getElementById('bpmVal').textContent = bpmSlider.value;
-  if (playing) statusEl.textContent = '播放中 · ' + bpmSlider.value + ' BPM';
+  if (playing) statusEl.textContent = tr('playingAt', bpmSlider.value);
 });
 volSlider.addEventListener('input', () => {
   document.getElementById('volVal').textContent = volSlider.value + '%';
@@ -736,17 +899,13 @@ function applyScore(msg){
   parseScore(scoreText.value);
   if (parseWarnings.length){
     statusEl.className = 'status warn';
-    statusEl.textContent = '⚠ ' + parseWarnings.join('；');
+    statusEl.textContent = '⚠ ' + parseWarnings.join('; ');
   } else {
     statusEl.className = 'status';
-    statusEl.textContent = (msg || '乐谱已应用') + '：共 ' + events.length + ' 个八分音符。';
+    statusEl.textContent = (msg ? msg + ' · ' : '') + tr('slotCount', events.length);
   }
 }
 document.getElementById('btnApply').addEventListener('click', () => applyScore());
-document.getElementById('btnReset').addEventListener('click', () => {
-  scoreText.value = DEFAULT_SCORE;
-  applyScore('已恢复 Pocket Groove 11');
-});
 
 /* ==================== PDF score recognition ========================== */
 /* Notepan-style vector PDFs carry a text layer where every note label
@@ -775,7 +934,7 @@ function loadPdfJs(){
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
       res(window.pdfjsLib);
     };
-    s.onerror = () => rej(new Error('pdf.js 加载失败（首次使用需联网）'));
+    s.onerror = () => rej(new Error(tr('pdfJsFail')));
     document.head.appendChild(s);
   });
 }
@@ -933,14 +1092,14 @@ async function recognizePdf(file){
     for (const {top, bottom} of groupSystems(realRows)) allSystems.push({page: p, top, bottom});
   }
   if (!allSystems.length)
-    throw new Error('未在 PDF 文本层找到乐谱记号——扫描件或纯图形谱需要 OCR/视觉模型');
-  const out = ['# 从 PDF 识别：' + file.name + '（请核对节奏与左右手）'];
+    throw new Error(tr('pdfNoScore'));
+  const out = [tr('pdfHeader', file.name)];
   let pageMarked = null, fallbackStep = null;
   allSystems.forEach(({page, top, bottom}, idx) => {
     const {lines, step} = systemToLines(top, bottom, fallbackStep, idx === allSystems.length - 1);
     if (step) fallbackStep = step;
     if (lines.length){
-      if (pageMarked !== page){ out.push('# 第 ' + page + ' 页'); pageMarked = page; }
+      if (pageMarked !== page){ out.push(tr('pdfPage', page)); pageMarked = page; }
       out.push(...lines, '');
     }
   });
@@ -953,10 +1112,11 @@ pdfFile.addEventListener('change', async () => {
   const f = pdfFile.files[0];
   if (!f) return;
   statusEl.className = 'status';
-  statusEl.textContent = '正在识别 PDF…';
+  statusEl.textContent = tr('pdfLoading');
   try {
     scoreText.value = await recognizePdf(f);
-    applyScore('PDF 识别完成');
+    applyScore(tr('pdfDone'));
+    dirty = true;   // recognized score isn't in the library yet — guard against accidental discard
   } catch (err){
     statusEl.className = 'status warn';
     statusEl.textContent = '⚠ ' + err.message;
@@ -964,91 +1124,184 @@ pdfFile.addEventListener('change', async () => {
   pdfFile.value = '';
 });
 
-/* ==================== Save / load scores ============================= */
-// Plain-text export/import: works everywhere, survives browser resets.
-document.getElementById('btnExport').addEventListener('click', () => {
-  const blob = new Blob([scoreText.value], {type: 'text/plain;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'handpan-score-' + new Date().toISOString().slice(0, 10) + '.txt';
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-});
-const txtFile = document.getElementById('txtFile');
-document.getElementById('btnImport').addEventListener('click', () => txtFile.click());
-txtFile.addEventListener('change', () => {
-  const f = txtFile.files[0];
-  if (!f) return;
-  const rd = new FileReader();
-  rd.onload = () => { scoreText.value = rd.result; applyScore('已导入 ' + f.name); };
-  rd.readAsText(f);
-  txtFile.value = '';
-});
-
-// In-browser library (localStorage). Unavailable in sandboxed previews /
-// private mode — the row hides itself and txt export remains the fallback.
+/* ==================== Score library ================================== */
+/* Built-in samples are virtual entries (not persisted, not deletable);
+ * user scores live in localStorage. Option values are prefixed 'b:'/'u:'
+ * and set via the DOM .value property, so names never need HTML-escaping.
+ * Selecting an entry loads it (the select IS the load action); '+' opens
+ * an inline name field; '✕' uses a two-tap arm/confirm instead of a
+ * blocking dialog. When localStorage is unavailable (sandboxed preview,
+ * private mode) the +/✕ buttons hide and built-ins keep working.        */
 const LIB_KEY = 'handpan_scores_v1';
-function libStore(){
-  try {
-    localStorage.setItem('__probe', '1');
-    localStorage.removeItem('__probe');
-    return localStorage;
-  } catch (e){ return null; }
-}
+const BUILTINS = { 'Pocket Groove 11': DEFAULT_SCORE };
+
 function libRead(){
-  const s = libStore();
+  const s = store();
   if (!s) return {};
   try { return JSON.parse(s.getItem(LIB_KEY) || '{}'); } catch (e){ return {}; }
 }
-function libWrite(obj){ const s = libStore(); if (s) s.setItem(LIB_KEY, JSON.stringify(obj)); }
+function libWrite(obj){ const s = store(); if (s) s.setItem(LIB_KEY, JSON.stringify(obj)); }
 
-const libRow = document.getElementById('libRow');
-const libSel = document.getElementById('libSel');
-function refreshLib(){
-  if (!libStore()){ libRow.style.display = 'none'; return; }
-  const names = Object.keys(libRead()).sort();
-  libSel.innerHTML = names.length
-    ? names.map(n => '<option>' + n.replace(/</g, '&lt;') + '</option>').join('')
-    : '<option value="" disabled selected>（曲库为空）</option>';
+const libSel     = document.getElementById('libSel');
+const btnLibSave = document.getElementById('btnLibSave');
+const btnLibDel  = document.getElementById('btnLibDel');
+const saveDlg    = document.getElementById('saveDlg');
+const saveName   = document.getElementById('saveName');
+let dirty = false, prevSel = null, delTimer = null;
+
+// dirty = editor content diverges from the selected library entry;
+// cleared on load/save, set on typing and after PDF recognition.
+scoreText.addEventListener('input', () => { dirty = true; });
+
+function selIsBuiltin(){ return libSel.value.startsWith('b:'); }
+function selName(){ return libSel.value.slice(2); }
+
+function disarmDelete(){
+  btnLibDel.classList.remove('armed');
+  btnLibDel.textContent = '✕';
+  if (delTimer){ clearTimeout(delTimer); delTimer = null; }
 }
-document.getElementById('btnLibSave').addEventListener('click', () => {
-  const name = prompt('曲目名称：', 'Pocket Groove 11');
-  if (!name) return;
+
+function updateLibButtons(){
+  const canStore = !!store();
+  btnLibSave.style.display = canStore ? '' : 'none';
+  btnLibDel.style.display  = canStore ? '' : 'none';
+  btnLibDel.disabled = selIsBuiltin();
+  disarmDelete();
+}
+
+function refreshLib(keepValue){
+  const cur = keepValue || libSel.value;
+  libSel.innerHTML = '';
+  const gb = document.createElement('optgroup');
+  gb.label = tr('builtinGroup');
+  for (const n in BUILTINS){
+    const o = document.createElement('option');
+    o.value = 'b:' + n; o.textContent = n;
+    gb.appendChild(o);
+  }
+  libSel.appendChild(gb);
+  const names = Object.keys(libRead()).sort();
+  if (names.length){
+    const gu = document.createElement('optgroup');
+    gu.label = tr('userGroup');
+    for (const n of names){
+      const o = document.createElement('option');
+      o.value = 'u:' + n; o.textContent = n;
+      gu.appendChild(o);
+    }
+    libSel.appendChild(gu);
+  }
+  libSel.value = (cur && [...libSel.options].some(o => o.value === cur))
+                 ? cur : 'b:' + Object.keys(BUILTINS)[0];
+  updateLibButtons();
+}
+
+function loadSelected(){
+  const text = selIsBuiltin() ? BUILTINS[selName()] : libRead()[selName()];
+  if (text == null) return;
+  scoreText.value = text;
+  applyScore(tr('loaded', selName()));
+  dirty = false;
+}
+
+libSel.addEventListener('change', () => {
+  if (dirty && !safeConfirm(tr('dirtyConfirm'))){
+    if (prevSel) libSel.value = prevSel;   // revert the selection, keep the edits
+    updateLibButtons();
+    return;
+  }
+  prevSel = libSel.value;
+  updateLibButtons();
+  loadSelected();
+});
+
+btnLibSave.addEventListener('click', () => {
+  const prefill = selIsBuiltin() ? '' : selName();    // prefill = quick overwrite
+  if (typeof saveDlg.showModal !== 'function'){       // very old browsers: fall back to prompt()
+    const n = prompt(tr('savePh'), prefill);
+    if (n && n.trim()){ saveName.value = n.trim(); commitSave(); }
+    return;
+  }
+  saveName.value = prefill;
+  saveDlg.showModal();
+  saveName.focus();
+  saveName.select();
+});
+function commitSave(){
+  const n = saveName.value.trim();
+  if (!n) return;
   const lib = libRead();
-  lib[name] = scoreText.value;
+  lib[n] = scoreText.value;
   libWrite(lib);
-  refreshLib();
-  libSel.value = name;
+  if (saveDlg.open) saveDlg.close();
+  dirty = false;
+  refreshLib('u:' + n);
+  prevSel = libSel.value;
   statusEl.className = 'status';
-  statusEl.textContent = '已存入曲库：' + name;
+  statusEl.textContent = tr('saved', n);
+}
+document.getElementById('btnSaveOk').addEventListener('click', commitSave);
+document.getElementById('btnSaveCancel').addEventListener('click', () => saveDlg.close());
+saveName.addEventListener('keydown', e => {
+  if (e.key === 'Enter'){ e.preventDefault(); commitSave(); }
+  // Escape closes natively via the dialog's cancel behavior
 });
-document.getElementById('btnLibLoad').addEventListener('click', () => {
-  const lib = libRead(), name = libSel.value;
-  if (!name || !(name in lib)) return;
-  scoreText.value = lib[name];
-  applyScore('已载入「' + name + '」');
-});
-document.getElementById('btnLibDel').addEventListener('click', () => {
-  const name = libSel.value;
-  if (!name || !confirm('删除「' + name + '」？')) return;
+// Clicking the backdrop closes the dialog (backdrop clicks target the <dialog> itself)
+saveDlg.addEventListener('click', e => { if (e.target === saveDlg) saveDlg.close(); });
+
+btnLibDel.addEventListener('click', () => {
+  if (selIsBuiltin()) return;
+  if (!btnLibDel.classList.contains('armed')){
+    btnLibDel.classList.add('armed');          // first tap arms for 3 s
+    btnLibDel.textContent = tr('sure');
+    delTimer = setTimeout(disarmDelete, 3000);
+    return;
+  }
+  const n = selName();
   const lib = libRead();
-  delete lib[name];
+  delete lib[n];
   libWrite(lib);
-  refreshLib();
+  refreshLib('b:' + Object.keys(BUILTINS)[0]);
+  prevSel = libSel.value;
+  statusEl.className = 'status';
+  statusEl.textContent = tr('deleted', n);
 });
-refreshLib();
+
+/* ==================== Language toggle ================================ */
+const langBtn = document.getElementById('langBtn');
+function setLang(l){
+  lang = l;
+  document.documentElement.lang = (l === 'zh') ? 'zh-CN' : 'en';
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.innerHTML = tr(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = tr(el.dataset.i18nTitle); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = tr(el.dataset.i18nPh); });
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', tr(el.dataset.i18nAria)); });
+  langBtn.textContent = (l === 'zh') ? 'EN' : '中';
+  btnPlay.textContent = playing ? tr('pause') : tr('play');   // state-dependent, set after the sweep
+  const s = store(); if (s) s.setItem('handpan_lang', l);
+  refreshLib();      // optgroup labels
+  renderTrack();     // column tooltips
+}
+langBtn.addEventListener('click', () => setLang(lang === 'zh' ? 'en' : 'zh'));
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'Space' && document.activeElement !== scoreText &&
-      document.activeElement.tagName !== 'BUTTON'){
+  const ae = document.activeElement;
+  if (e.code === 'Space' && ae !== scoreText &&
+      !['BUTTON', 'INPUT', 'SELECT'].includes(ae.tagName)){
     e.preventDefault();
     playing ? stopPlay() : startFrom(0);
   }
 });
 
 /* ------------------------------ Init -------------------------------- */
-scoreText.value = DEFAULT_SCORE;
-parseScore(DEFAULT_SCORE);
+// Score editor: collapsed by default on phones, open on desktop
+const editWrap = document.getElementById('editWrap');
+if (!window.matchMedia('(max-width:860px)').matches) editWrap.open = true;
+
+setLang(lang);            // paints all static text + populates the library
+prevSel = libSel.value;
+loadSelected();           // built-in sample -> editor, parser, track view
 </script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 {
-  "name": "智慧手碟",
-  "short_name": "智慧手碟",
-  "description": "手碟播放器 · 你的练习搭子",
+  "name": "智音手碟",
+  "short_name": "智音手碟",
+  "description": "知音手碟 · 你的练习搭子",
   "start_url": "./handpan-player.html",
   "scope": "./",
   "display": "standalone",

@@ -3,7 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>手碟播放器 · Pocket Groove 11</title>
+<title>智慧手碟</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#0f1317">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="智慧手碟">
+<script>
+  if ('serviceWorker' in navigator){
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+</script>
 <style>
   /* ---------- Design tokens: nitrided-steel handpan palette ---------- */
   :root{
@@ -43,7 +54,7 @@
 
   /* ---------- Pan ---------- */
   #panBox{display:flex;justify-content:center;}
-  svg{max-width:520px;width:100%;height:auto;display:block;}
+  svg{max-width:520px;width:100%;height:auto;display:block;touch-action:none;}
   .pad-circle{cursor:pointer;transition:filter .12s;}
   .pad-circle:hover{filter:brightness(1.12);}
   .pad-label{font-size:19px;font-weight:600;fill:#333c44;pointer-events:none;}
@@ -126,8 +137,8 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>手碟播放器 <em>Handpan</em></h1>
-    <span class="sub">Pocket Groove 11 · Notepan</span>
+    <h1>智慧手碟 <em>Handpan</em></h1>
+    <span class="sub">你的练习搭子</span>
     <span class="scale-tag">音阶：D Kurd 8+1 &nbsp;·&nbsp; D3 / A3 Bb3 C4 D4 E4 F4 G4 A4</span>
   </header>
 
@@ -148,7 +159,7 @@
       <div class="transport">
         <button class="primary" id="btnPlay">▶ 播放</button>
         <button id="btnStop">■ 停止</button>
-        <label class="chk"><input type="checkbox" id="chkLoop" checked>循环</label>
+        <label class="chk"><input type="checkbox" id="chkLoop">循环</label>
         <label class="chk"><input type="checkbox" id="chkMetro">节拍器</label>
       </div>
 
@@ -312,9 +323,9 @@ function buildPan(){
     'aria-label':'Slap（碟面拍击）'}, pan);
   el('circle', {cx:CX, cy:CY, r:214, fill:'none', stroke:'#161d24',
     'stroke-width':1.5, opacity:.7, 'pointer-events':'none'}, pan);
-  const slapTrig = () => { ensureCtx(); playEventNow([{key:'S', hand:null}]); };
-  shell.addEventListener('click', slapTrig);
-  shell.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();slapTrig();} });
+  const slapTrig = e => { e.preventDefault(); ensureCtx(); playEventNow([{key:'S', hand:null}]); };
+  shell.addEventListener('pointerdown', slapTrig);
+  shell.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();slapTrig(e);} });
 
   // T shoulder ring around the ding
   const tRing = el('circle', {id:'tRing', cx:CX, cy:CY, r:T_R, fill:'none',
@@ -323,9 +334,9 @@ function buildPan(){
   el('text', {x:CX + (T_R+16)*Math.SQRT1_2, y:CY - (T_R+13)*Math.SQRT1_2,
     class:'pad-num', 'text-anchor':'middle', 'pointer-events':'none'}, pan)
     .textContent = 'T';
-  const tTrig = () => { ensureCtx(); playEventNow([{key:'T', hand:null}]); };
-  tRing.addEventListener('click', tTrig);
-  tRing.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();tTrig();} });
+  const tTrig = e => { e.preventDefault(); ensureCtx(); playEventNow([{key:'T', hand:null}]); };
+  tRing.addEventListener('pointerdown', tTrig);
+  tRing.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();tTrig(e);} });
   padEls['T'] = {g:tRing, cx:CX, cy:CY, r:T_R, ring:true};
   padEls['S'] = {g:shell, cx:CX, cy:CY, r:228, shell:true};
 
@@ -340,9 +351,9 @@ function buildPan(){
       .textContent = n.name;
     el('text', {class:'pad-num', x:cx, y:cy + 18, 'text-anchor':'middle'}, g)
       .textContent = n.ding ? 'Ding' : key;
-    const trigger = () => { ensureCtx(); playEventNow([{key, hand:null}]); };
-    g.addEventListener('click', trigger);
-    g.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();trigger();} });
+    const trigger = e => { e.preventDefault(); ensureCtx(); playEventNow([{key, hand:null}]); };
+    g.addEventListener('pointerdown', trigger);
+    g.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();trigger(e);} });
     padEls[key] = {g, cx, cy, r};
   };
 
@@ -613,9 +624,12 @@ function highlightToken(evIdx){
   const s = trackView.querySelector('.col[data-event="' + evIdx + '"]');
   if (s){
     s.classList.add('now');
+    // Scroll only trackView's own box, never scrollIntoView — that walks every
+    // scrollable ancestor including the page, which fights a user's manual
+    // scroll on mobile (page keeps snapping back to the score on every tick).
     const r = s.getBoundingClientRect(), box = trackView.getBoundingClientRect();
-    if (r.top < box.top || r.bottom > box.bottom)
-      s.scrollIntoView({block:'nearest', behavior:'smooth'});
+    if (r.top < box.top) trackView.scrollBy({top: r.top - box.top, behavior: 'smooth'});
+    else if (r.bottom > box.bottom) trackView.scrollBy({top: r.bottom - box.bottom, behavior: 'smooth'});
   }
 }
 
@@ -778,10 +792,20 @@ function sparseFallback(top, bottom, all){
  * plus round(localGap / step) — instead of round((x - x0) / step) from one
  * fixed origin. The latter compounds a few % of step error linearly over a
  * row's length and silently drifts a whole slot by column ~15-20; the
- * incremental form only ever rounds a small local ratio, so it doesn't. */
-function systemToLines(top, bottom){
+ * incremental form only ever rounds a small local ratio, so it doesn't.
+ *
+ * `fallbackStep` is the most recently, reliably-derived step from an earlier
+ * system in this document (or null). A system with only 2 columns has just
+ * one gap to go on, which can't tell "adjacent" from "several slots apart" —
+ * every system in a document shares essentially the same pixel-per-8th-note
+ * step, so falling back to a known-good one beats guessing from a single
+ * ambiguous gap. `isLastSystem` suppresses the trailing-rest recovery below:
+ * that assumes a system is followed by more content, which isn't true for the
+ * very last system of the whole piece. Returns {lines, step} — step is the
+ * one actually used, for the caller to carry forward as the next fallback. */
+function systemToLines(top, bottom, fallbackStep, isLastSystem){
   const all = [...(top ? top.items : []), ...(bottom ? bottom.items : [])];
-  if (all.length < 2) return sparseFallback(top, bottom, all);
+  if (all.length < 2) return {lines: sparseFallback(top, bottom, all), step: null};
   const COL_TOL = 6;
   const sortedX = all.map(it => it.x).sort((a, b) => a - b);
   const cols = [];
@@ -790,21 +814,30 @@ function systemToLines(top, bottom){
     if (c && x - c.x < COL_TOL) c.x = (c.x * c.n + x) / ++c.n;
     else cols.push({x, n: 1});
   }
-  if (cols.length < 2) return sparseFallback(top, bottom, all);
+  if (cols.length < 2) return {lines: sparseFallback(top, bottom, all), step: null};
   const gaps = [];
   for (let i = 1; i < cols.length; i++) gaps.push(cols[i].x - cols[i-1].x);
-  const minGap = Math.min(...gaps);
-  const unitGaps = gaps.filter(g => g <= minGap * 1.5).sort((a, b) => a - b);
-  const step = unitGaps[Math.floor(unitGaps.length / 2)];   // median of the smallest-gap cluster
-  if (!isFinite(step) || step <= 0) return [];
+  let step, usedFallback = false;
+  if (cols.length >= 3){
+    const minGap = Math.min(...gaps);
+    const unitGaps = gaps.filter(g => g <= minGap * 1.5).sort((a, b) => a - b);
+    step = unitGaps[Math.floor(unitGaps.length / 2)];   // median of the smallest-gap cluster
+  } else if (fallbackStep){
+    step = fallbackStep;
+    usedFallback = true;
+  } else {
+    step = gaps[0];   // no other reference anywhere yet — best guess available
+  }
+  if (!isFinite(step) || step <= 0) return {lines: [], step: null};
   const colSlot = [0];
   for (let i = 1; i < cols.length; i++)
     colSlot.push(colSlot[i - 1] + Math.max(1, Math.round(gaps[i - 1] / step)));
   // one past the last visible glyph; if that's odd, the phrase almost certainly
   // ends on an invisible trailing rest (this style's phrases end on even slots)
+  // — unless this is the very last system in the piece, which just ends here.
   let nSlots = colSlot[colSlot.length - 1] + 1;
-  if (nSlots % 2 === 1) nSlots++;
-  if (nSlots > 256) return [];
+  if (!isLastSystem && nSlots % 2 === 1) nSlots++;
+  if (nSlots > 256) return {lines: [], step: null};
   const slotOf = x => {
     let lo = 0, hi = cols.length - 1;
     while (lo < hi){
@@ -823,15 +856,48 @@ function systemToLines(top, bottom){
     // barline every 8 slots for readability (assumes 4/4, cosmetic only)
     return arr.flatMap((t, i) => (i > 0 && i % 8 === 0) ? ['|', t] : [t]).join(' ');
   };
-  if (top && bottom) return ['R: ' + toRow(top), 'L: ' + toRow(bottom)];
-  return [toRow(top || bottom)];
+  const lines = (top && bottom) ? ['R: ' + toRow(top), 'L: ' + toRow(bottom)]
+                                 : [toRow(top || bottom)];
+  return {lines, step: usedFallback ? null : step};
+}
+
+// Group y-clustered rows into systems. Usually a system is just 2 rows (R
+// above L), but when a hand hits two pads at once, Notepan renders the second
+// note of that chord on its own sparse row, offset by the same ~16pt gap used
+// between R and L in general — indistinguishable from a real 3rd hand row by
+// y-gap alone. Chain rows within SYSTEM_GAP of each other; for a chain of 3+,
+// the 2 densest rows are the real hands (a hand's row has one entry per note
+// it ever plays, so it's never sparser than its own chord-helper), and any
+// other row is a helper merged into whichever hand row it sits closer to —
+// its items land at x's already present in that row, so systemToLines's
+// existing column clustering folds them into a '+' chord automatically.
+function groupSystems(rows){
+  const chains = [];
+  for (const r of rows){
+    const last = chains[chains.length - 1];
+    if (last && r.y - last[last.length - 1].y <= SYSTEM_GAP) last.push(r);
+    else chains.push([r]);
+  }
+  return chains.map(chain => {
+    if (chain.length <= 2) return {top: chain[0], bottom: chain[1] || null};
+    const [top, bottom] = chain.slice().sort((a, b) => b.items.length - a.items.length)
+                                .slice(0, 2).sort((a, b) => a.y - b.y);
+    for (const r of chain){
+      if (r === top || r === bottom) continue;
+      const target = Math.abs(r.y - top.y) <= Math.abs(r.y - bottom.y) ? top : bottom;
+      target.items.push(...r.items);
+    }
+    return {top, bottom};
+  });
 }
 
 async function recognizePdf(file){
   const lib = await loadPdfJs();
   const doc = await lib.getDocument({data: await file.arrayBuffer()}).promise;
-  const out = ['# 从 PDF 识别：' + file.name + '（请核对节奏与左右手）'];
-  let systems = 0;
+  // Collect every system up front (across all pages) before emitting any output — this is what
+  // lets us know which system is the document's last one, and lets step estimates carry forward
+  // from earlier, denser systems to later, sparser ones (see systemToLines).
+  const allSystems = [];   // {page, top, bottom}
   for (let p = 1; p <= doc.numPages; p++){
     const page = await doc.getPage(p);
     const viewport = page.getViewport({scale: 1});   // accounts for the page's /Rotate entry
@@ -852,23 +918,20 @@ async function recognizePdf(file){
                                       .flatMap(r => r.items.map(it => it.x)));
     const realRows = rows.filter(r => r.items.length >= MIN_ROW_TOKENS ||
       (isFinite(noteMinX) && r.items.every(it => it.x >= noteMinX)));
-    let pageMarked = false;
-    let i = 0;
-    while (i < realRows.length){
-      const top = realRows[i];
-      const bottom = (i + 1 < realRows.length && (realRows[i + 1].y - top.y) <= SYSTEM_GAP)
-                     ? realRows[i + 1] : null;
-      const lines = systemToLines(top, bottom);
-      if (lines.length){
-        if (!pageMarked){ out.push('# 第 ' + p + ' 页'); pageMarked = true; }
-        out.push(...lines, '');
-        systems++;
-      }
-      i += bottom ? 2 : 1;
-    }
+    for (const {top, bottom} of groupSystems(realRows)) allSystems.push({page: p, top, bottom});
   }
-  if (!systems)
+  if (!allSystems.length)
     throw new Error('未在 PDF 文本层找到乐谱记号——扫描件或纯图形谱需要 OCR/视觉模型');
+  const out = ['# 从 PDF 识别：' + file.name + '（请核对节奏与左右手）'];
+  let pageMarked = null, fallbackStep = null;
+  allSystems.forEach(({page, top, bottom}, idx) => {
+    const {lines, step} = systemToLines(top, bottom, fallbackStep, idx === allSystems.length - 1);
+    if (step) fallbackStep = step;
+    if (lines.length){
+      if (pageMarked !== page){ out.push('# 第 ' + page + ' 页'); pageMarked = page; }
+      out.push(...lines, '');
+    }
+  });
   return out.join('\n');
 }
 

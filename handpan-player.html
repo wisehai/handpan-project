@@ -12,7 +12,21 @@
 <meta name="apple-mobile-web-app-title" content="知音手碟">
 <script>
   if ('serviceWorker' in navigator){
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js', {updateViaCache: 'none'}).then(reg => {
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener('statechange', () => {
+            // controller already set = this is an update, not the first-ever install
+            if (nw.state === 'installed' && navigator.serviceWorker.controller){
+              const b = document.getElementById('updateBanner');
+              if (b) b.hidden = false;
+            }
+          });
+        });
+      }).catch(() => {});
+    });
   }
 </script>
 <style>
@@ -147,15 +161,21 @@
     border-radius:9px;padding:8px 10px;flex:1;min-width:120px;}
   input[type=text]:focus-visible{outline:2px solid var(--brass);outline-offset:1px;}
   dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);
-    border-radius:14px;padding:20px;min-width:min(320px,86vw);}
+    border-radius:14px;padding:20px;min-width:min(320px,86vw);
+    margin-top:8vh;margin-right:auto;margin-bottom:auto;margin-left:auto;}
   dialog::backdrop{background:rgba(6,9,12,.6);backdrop-filter:blur(2px);}
   dialog h3{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.16em;
     text-transform:uppercase;margin-bottom:12px;}
   dialog input[type=text]{width:100%;}
   .dlg-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
+  .update-banner{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:20;
+    background:var(--panel);color:var(--ink);border:1px solid var(--brass);border-radius:999px;
+    padding:9px 18px;font-size:13px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.35);}
+  .update-banner:hover{border-color:var(--ink);}
 </style>
 </head>
 <body>
+<button id="updateBanner" class="update-banner" data-i18n="updateReady" hidden>New version available — tap to refresh</button>
 <div class="wrap">
   <header>
     <h1 data-i18n="title">Wise <em>Handpan</em></h1>
@@ -301,6 +321,7 @@ const I18N = {
     ariaSlap:   'Slap (shell)',
     ariaT:      'Shoulder tone T',
     ariaPad:    k => 'Pad ' + k,
+    updateReady: 'New version available — tap to refresh',
   },
   zh: {
     title:      '知音手碟 <em>Handpan</em>',
@@ -358,6 +379,7 @@ const I18N = {
     ariaSlap:   'Slap（碟面拍击）',
     ariaT:      '肩音 T',
     ariaPad:    k => '音区 ' + k,
+    updateReady: '有新版本，点击刷新',
   },
 };
 
@@ -1264,6 +1286,7 @@ btnLibDel.addEventListener('click', () => {
   libWrite(lib);
   refreshLib('b:' + Object.keys(BUILTINS)[0]);
   prevSel = libSel.value;
+  loadSelected();
   statusEl.className = 'status';
   statusEl.textContent = tr('deleted', n);
 });
@@ -1284,6 +1307,8 @@ function setLang(l){
   renderTrack();     // column tooltips
 }
 langBtn.addEventListener('click', () => setLang(lang === 'zh' ? 'en' : 'zh'));
+
+document.getElementById('updateBanner').addEventListener('click', () => window.location.reload());
 
 document.addEventListener('keydown', e => {
   const ae = document.activeElement;

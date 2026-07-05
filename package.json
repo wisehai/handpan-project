@@ -1,0 +1,8 @@
+{
+  "name": "handpan-project-tooling",
+  "private": true,
+  "description": "Dev-only tooling (browser verification). Not part of the shipped single-file app.",
+  "devDependencies": {
+    "playwright": "^1.48.0"
+  }
+}

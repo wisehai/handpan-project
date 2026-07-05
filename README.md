@@ -1,4 +1,4 @@
-# 智音手碟 · Wise-Handpan
+# 知音手碟 · Wise-Handpan
 
 [中文](#中文) | [English](#english)
 

@@ -18,6 +18,8 @@ workflows:
     scripts:
       - name: Copy web app into ios-app/www
         script: |
+          # Ensure target directory exists (git does not track empty dirs)
+          mkdir -p ios-app/www
           cp handpan-player.html ios-app/www/index.html
       - name: Install npm dependencies
         script: |

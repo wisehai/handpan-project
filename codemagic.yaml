@@ -13,7 +13,8 @@ workflows:
         bundle_identifier: com.wisehai.handpan
       node: 22
       vars:
-        XCODE_WORKSPACE: "ios-app/ios/App/App.xcworkspace"
+        # SPM-based Capacitor project: build from .xcodeproj, no workspace exists
+        XCODE_PROJECT: "ios-app/ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
     scripts:
       - name: Copy web app into ios-app/www
@@ -43,7 +44,7 @@ workflows:
       - name: Build .ipa
         script: |
           xcode-project build-ipa \
-            --workspace "$XCODE_WORKSPACE" \
+            --workspace "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
     artifacts:
       - ios-app/ios/App/build/ios/ipa/*.ipa

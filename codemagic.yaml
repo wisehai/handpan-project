@@ -1,16 +1,16 @@
 workflows:
   ios-handpan:
-    name: 智慧手碟 iOS
+    name: Wise Handpan
     max_build_duration: 60
     instance_type: mac_mini_m2
     integrations:
       # Name must match the App Store Connect API key integration you create
       # in Codemagic team settings (see ios-app/README.md step 3-4).
-      app_store_connect: codemagic_ios_key
+      app_store_connect: WiseHai
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.handpan.player
+        bundle_identifier: com.wisehai.handpan
       node: 22
       vars:
         XCODE_WORKSPACE: "ios-app/ios/App/App.xcworkspace"

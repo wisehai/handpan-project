@@ -38,8 +38,8 @@ workflows:
           xcode-project use-profiles
       - name: Inspect generated iOS project
         script: |
-        # See what cap add ios actually produced
-        ls -la ios-app/ios/App/
+          # See what cap add ios actually produced
+          ls -la ios-app/ios/App/
       - name: Build .ipa
         script: |
           xcode-project build-ipa \

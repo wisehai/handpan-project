@@ -41,6 +41,11 @@ workflows:
         script: |
           # See what cap add ios actually produced
           ls -la ios-app/ios/App/
+      - name: Set build number
+        script: |
+          cd ios-app/ios/App
+          # Use Codemagic's build index as CFBundleVersion (monotonically increasing)
+          agvtool new-version -all $PROJECT_BUILD_NUMBER
       - name: Build .ipa
         script: |
           xcode-project build-ipa \

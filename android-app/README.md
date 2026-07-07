@@ -1,4 +1,4 @@
-# 智慧手碟 · Android 封装 (Capacitor)
+# 悟碟 · Android 封装 (Capacitor)
 
 把 `../handpan-player.html` 封装成 Android APK。`www/index.html` 是它的一份**普通拷贝**（不是软链接
 ——曾经用软链接图省事，但 `npx cap copy` 会把软链接原样复制到 `android/app/src/main/assets/public/`，

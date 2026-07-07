@@ -1,4 +1,4 @@
-# 智慧手碟 · iOS 封装 (Capacitor)
+# 悟碟 · iOS 封装 (Capacitor)
 
 把 `../handpan-player.html` 封装成 iOS App，走 App Store / TestFlight。
 

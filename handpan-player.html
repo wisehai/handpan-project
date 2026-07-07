@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wise Handpan · 知音手碟</title>
+<title>WisePan</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0f1317">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="知音手碟">
+<meta name="apple-mobile-web-app-title" content="悟碟">
 <script>
   if ('serviceWorker' in navigator){
     window.addEventListener('load', () => {
@@ -172,15 +172,29 @@
     background:var(--panel);color:var(--ink);border:1px solid var(--brass);border-radius:999px;
     padding:9px 18px;font-size:13px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.35);}
   .update-banner:hover{border-color:var(--ink);}
+
+  /* ---------- Immersive mode ---------- */
+  .immersive-toggle{position:fixed;top:14px;right:14px;z-index:20;padding:5px 12px;
+    border-radius:999px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,.35);}
+  body.immersive header,
+  body.immersive .legend,
+  body.immersive .transport,
+  body.immersive .sliders,
+  body.immersive #status,
+  body.immersive .card h2,
+  body.immersive #libRow,
+  body.immersive #editWrap{display:none;}
+  body.immersive .grid{grid-template-columns:1fr;gap:10px;margin-top:56px;}
+  body.immersive .card{padding:10px;}
 </style>
 </head>
 <body>
 <button id="updateBanner" class="update-banner" data-i18n="updateReady" hidden>New version available — tap to refresh</button>
+<button id="btnImmersive" class="immersive-toggle" data-i18n="immersive">⛶ Focus</button>
 <div class="wrap">
   <header>
-    <h1 data-i18n="title">Wise <em>Handpan</em></h1>
+    <h1 data-i18n="title">Wise <em>Pan</em></h1>
     <span class="sub" data-i18n="subtitle">Your practice partner</span>
-    <span class="scale-tag" data-i18n="scaleTag">Scale: D Kurd 8+1 · D3 / A3 Bb3 C4 D4 E4 F4 G4 A4</span>
     <button id="langBtn" class="lang" aria-label="Switch language / 切换语言">中</button>
   </header>
 
@@ -200,7 +214,6 @@
 
       <div class="transport">
         <button class="primary" id="btnPlay" data-i18n="play">▶ Play</button>
-        <button id="btnStop" data-i18n="stop">■ Stop</button>
         <label class="chk"><input type="checkbox" id="chkLoop"><span data-i18n="loop">Loop</span></label>
         <label class="chk"><input type="checkbox" id="chkMetro"><span data-i18n="metro">Metronome</span></label>
       </div>
@@ -266,17 +279,15 @@
  * Dict values are plain strings, HTML snippets, or (args)=>string fns.   */
 const I18N = {
   en: {
-    title:      'Wise <em>Handpan</em>',
-    subtitle:   'Your practice partner',
-    scaleTag:   'Scale: D Kurd 8+1 · D3 / A3 Bb3 C4 D4 E4 F4 G4 A4',
-    panTitle:   'Handpan · tap a pad / T ring / shell to preview',
+    title:      'Wise<em>Pan</em>',
+    subtitle:   'Your handpan practice partner',
+    panTitle:   'D Kurd Handpan · tap to preview',
     legendR:    'Right hand R',
     legendL:    'Left hand L',
     legendT:    'T = shoulder (ring around Ding)',
     legendS:    'S = slap (shell)',
     play:       '▶ Play',
     pause:      '⏸ Pause',
-    stop:       '■ Stop',
     loop:       'Loop',
     metro:      'Metronome',
     bpmLabel:   'Tempo BPM',
@@ -296,11 +307,9 @@ const I18N = {
     sure:       'Sure?',
     builtinGroup: 'Built-in',
     userGroup:  'My scores',
-    hint: 'The <code>R:</code> line is the right hand and the <code>L:</code> line right below it is the left; ' +
-          'columns align, one column per eighth note; notes in both rows of the same column = both hands together. ' +
-          'Tokens: <code>D</code> Ding, <code>1</code>–<code>8</code> tone fields, <code>T</code> shoulder, ' +
+    hint: 'Tokens: <code>D</code> Ding, <code>1</code>–<code>8</code> tone fields, <code>T</code> shoulder, ' +
           '<code>S</code> slap, <code>.</code> rest, <code>|</code> barline (display only), <code>#</code> comment line. ' +
-          'Single-line notation (no hand info) also works. Click any column below to play from there.',
+          'Click any column below to play from there.',
     playFromHere: 'Play from here',
     emptyScore: 'Score is empty — enter some tokens first.',
     playingAt:  bpm => 'Playing · ' + bpm + ' BPM',
@@ -322,19 +331,19 @@ const I18N = {
     ariaT:      'Shoulder tone T',
     ariaPad:    k => 'Pad ' + k,
     updateReady: 'New version available — tap to refresh',
+    immersive:  '⛶ Focus',
+    exitImmersive: '✕ Exit',
   },
   zh: {
-    title:      '知音手碟 <em>Handpan</em>',
-    subtitle:   '你的练习搭子',
-    scaleTag:   '音阶：D Kurd 8+1 · D3 / A3 Bb3 C4 D4 E4 F4 G4 A4',
-    panTitle:   '手碟 · 点击音区 / T 环 / 碟面空白处可试听',
+    title:      '悟<em>碟</em>',
+    subtitle:   '你的手碟练习搭子',
+    panTitle:   'D库尔德 手碟 · 点击可试听',
     legendR:    '右手 R',
     legendL:    '左手 L',
     legendT:    'T = 肩音（Ding 外圈）',
     legendS:    'S = Slap（碟面）',
     play:       '▶ 播放',
     pause:      '⏸ 暂停',
-    stop:       '■ 停止',
     loop:       '循环',
     metro:      '节拍器',
     bpmLabel:   '速度 BPM',
@@ -354,11 +363,10 @@ const I18N = {
     sure:       '确认?',
     builtinGroup: '内置',
     userGroup:  '我的曲子',
-    hint: '<code>R:</code> 行是右手、紧跟的 <code>L:</code> 行是左手，按列对齐，每列一个八分音符；' +
-          '两行同列都有音 = 双手同击。记号：<code>D</code> Ding，<code>1</code>–<code>8</code> 音区，' +
+    hint: '记号：<code>D</code> Ding，<code>1</code>–<code>8</code> 音区，' +
           '<code>T</code> 肩音，<code>S</code> Slap，<code>.</code> 休止，' +
           '<code>|</code> 小节线（仅显示），<code>#</code> 注释行。' +
-          '也兼容单行记法（不区分左右手）。点击下方任意列可从该处播放。',
+          '点击下方任意列可从该处播放。',
     playFromHere: '从这里播放',
     emptyScore: '乐谱为空，请先输入记号。',
     playingAt:  bpm => '播放中 · ' + bpm + ' BPM',
@@ -380,6 +388,8 @@ const I18N = {
     ariaT:      '肩音 T',
     ariaPad:    k => '音区 ' + k,
     updateReady: '有新版本，点击刷新',
+    immersive:  '⛶ 沉浸',
+    exitImmersive: '✕ 退出',
   },
 };
 
@@ -399,6 +409,7 @@ function detectLang(){
   return langs.some(l => l && l.toLowerCase().startsWith('zh')) ? 'zh' : 'en';
 }
 let lang = detectLang();
+let immersive = (store() && store().getItem('handpan_immersive')) === '1';
 
 function tr(key, ...args){
   const v = (I18N[lang] && I18N[lang][key]) ?? I18N.en[key] ?? key;
@@ -853,7 +864,7 @@ const statusEl   = document.getElementById('status');
 function eighthDur(){ return 30 / Number(bpmSlider.value); }   // 60/bpm/2
 
 function scheduler(){
-  while (playing && nextTime < actx.currentTime + LOOKAHEAD_S){
+  while (playing && pos < events.length && nextTime < actx.currentTime + LOOKAHEAD_S){
     const ev = events[pos];
     for (const h of ev.hits) playHit(h.key, nextTime, 0.85);
     if (chkMetro.checked && eighthCount % 2 === 0)
@@ -903,14 +914,14 @@ function stopPlay(silent){
   if (timer){ clearInterval(timer); timer = null; }
   visQueue = [];
   stopAtTime = Infinity;
+  if (pos >= events.length) pos = 0;   // finished naturally -> next Play starts over
   btnPlay.textContent = tr('play');
   trackView.querySelectorAll('.col.now').forEach(n => n.classList.remove('now'));
   if (!silent){ statusEl.className = 'status'; statusEl.textContent = tr('stopped'); }
 }
 
 /* ============================ Wire up UI ============================= */
-btnPlay.addEventListener('click', () => { playing ? stopPlay() : startFrom(0); });
-document.getElementById('btnStop').addEventListener('click', () => stopPlay());
+btnPlay.addEventListener('click', () => { playing ? stopPlay() : startFrom(pos); });
 
 bpmSlider.addEventListener('input', () => {
   document.getElementById('bpmVal').textContent = bpmSlider.value;
@@ -925,6 +936,7 @@ const scoreText = document.getElementById('scoreText');
 function applyScore(msg){
   stopPlay(true);
   parseScore(scoreText.value);
+  pos = 0;   // old resume position no longer maps to the freshly parsed score
   if (parseWarnings.length){
     statusEl.className = 'status warn';
     statusEl.textContent = '⚠ ' + parseWarnings.join('; ');
@@ -1308,6 +1320,7 @@ function setLang(l){
   document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', tr(el.dataset.i18nAria)); });
   langBtn.textContent = (l === 'zh') ? 'EN' : '中';
   btnPlay.textContent = playing ? tr('pause') : tr('play');   // state-dependent, set after the sweep
+  btnImmersive.textContent = immersive ? tr('exitImmersive') : tr('immersive');   // ditto
   const s = store(); if (s) s.setItem('handpan_lang', l);
   refreshLib();      // optgroup labels
   renderTrack();     // column tooltips
@@ -1316,12 +1329,22 @@ langBtn.addEventListener('click', () => setLang(lang === 'zh' ? 'en' : 'zh'));
 
 document.getElementById('updateBanner').addEventListener('click', () => window.location.reload());
 
+/* ==================== Immersive mode toggle =========================== */
+const btnImmersive = document.getElementById('btnImmersive');
+function setImmersive(v){
+  immersive = v;
+  document.body.classList.toggle('immersive', immersive);
+  btnImmersive.textContent = immersive ? tr('exitImmersive') : tr('immersive');
+  const s = store(); if (s) s.setItem('handpan_immersive', immersive ? '1' : '0');
+}
+btnImmersive.addEventListener('click', () => setImmersive(!immersive));
+
 document.addEventListener('keydown', e => {
   const ae = document.activeElement;
   if (e.code === 'Space' && ae !== scoreText &&
       !['BUTTON', 'INPUT', 'SELECT'].includes(ae.tagName)){
     e.preventDefault();
-    playing ? stopPlay() : startFrom(0);
+    playing ? stopPlay() : startFrom(pos);
   }
 });
 
@@ -1330,6 +1353,7 @@ document.addEventListener('keydown', e => {
 const editWrap = document.getElementById('editWrap');
 if (!window.matchMedia('(max-width:860px)').matches) editWrap.open = true;
 
+document.body.classList.toggle('immersive', immersive);
 setLang(lang);            // paints all static text + populates the library
 prevSel = libSel.value;
 loadSelected();           // built-in sample -> editor, parser, track view

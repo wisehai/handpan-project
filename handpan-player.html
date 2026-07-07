@@ -49,10 +49,10 @@
   html,body{background:var(--bg);color:var(--ink);
     font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;}
   body{min-height:100vh;
-    padding:calc(28px + env(safe-area-inset-top, 0px))
-      calc(20px + env(safe-area-inset-right, 0px))
-      calc(60px + env(safe-area-inset-bottom, 0px))
-      calc(20px + env(safe-area-inset-left, 0px));}
+    padding:max(28px, calc(env(safe-area-inset-top, 0px) + 6px))
+      max(20px, calc(env(safe-area-inset-right, 0px) + 6px))
+      max(60px, calc(env(safe-area-inset-bottom, 0px) + 6px))
+      max(20px, calc(env(safe-area-inset-left, 0px) + 6px));}
 
   .wrap{max-width:1100px;margin:0 auto;}
   header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:6px;}
@@ -191,7 +191,7 @@
   body.immersive #libRow,
   body.immersive #editWrap{display:none;}
   body.immersive .grid{grid-template-columns:1fr;gap:10px;
-    margin-top:calc(56px + env(safe-area-inset-top, 0px));}
+    margin-top:42px;}
   body.immersive .card{padding:10px;}
 </style>
 </head>

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>WisePan</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -168,13 +168,15 @@
     text-transform:uppercase;margin-bottom:12px;}
   dialog input[type=text]{width:100%;}
   .dlg-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
-  .update-banner{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:20;
+  .update-banner{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom, 0px));
+    transform:translateX(-50%);z-index:20;
     background:var(--panel);color:var(--ink);border:1px solid var(--brass);border-radius:999px;
     padding:9px 18px;font-size:13px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.35);}
   .update-banner:hover{border-color:var(--ink);}
 
   /* ---------- Immersive mode ---------- */
-  .immersive-toggle{position:fixed;top:14px;right:14px;z-index:20;padding:5px 12px;
+  .immersive-toggle{position:fixed;top:calc(14px + env(safe-area-inset-top, 0px));
+    right:calc(14px + env(safe-area-inset-right, 0px));z-index:20;padding:5px 12px;
     border-radius:999px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,.35);}
   body.immersive header,
   body.immersive .legend,
@@ -184,7 +186,8 @@
   body.immersive .card h2,
   body.immersive #libRow,
   body.immersive #editWrap{display:none;}
-  body.immersive .grid{grid-template-columns:1fr;gap:10px;margin-top:56px;}
+  body.immersive .grid{grid-template-columns:1fr;gap:10px;
+    margin-top:calc(56px + env(safe-area-inset-top, 0px));}
   body.immersive .card{padding:10px;}
 </style>
 </head>

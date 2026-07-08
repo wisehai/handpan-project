@@ -1,13 +1,15 @@
 // Minimal offline cache for the handpan app itself. Bump CACHE_NAME whenever
 // the cached files change so clients pick up the new version instead of
 // being stuck on a stale copy forever.
-const CACHE_NAME = 'handpan-v10';
+const CACHE_NAME = 'handpan-v11';
 const PRECACHE = [
   './handpan-player.html',
   './manifest.webmanifest',
   './icon-180.png',
   './icon-192.png',
   './icon-512.png',
+  './vendor/pdfjs/pdf.min.js',
+  './vendor/pdfjs/pdf.worker.min.js',
 ];
 
 self.addEventListener('install', e => {
@@ -24,9 +26,7 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// Same-origin: cache-first (app works fully offline once loaded once).
-// Cross-origin (e.g. the on-demand pdf.js CDN load for PDF import): always
-// go to the network — that feature already needs connectivity anyway.
+// Same-origin: cache-first (app and bundled PDF import work fully offline once loaded once).
 self.addEventListener('fetch', e => {
   if (new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(

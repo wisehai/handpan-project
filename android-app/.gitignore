@@ -7,4 +7,5 @@ android/capacitor-cordova-android-plugins/build/
 *.apk
 # generated copies of ../handpan-player.html (see README's rebuild steps) — not source
 www/index.html
+www/vendor/
 android/app/src/main/assets/public/index.html

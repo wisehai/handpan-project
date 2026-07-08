@@ -332,7 +332,7 @@ const I18N = {
     dirtyConfirm: 'The editor has unsaved changes. Discard them and switch?',
     pdfLoading: 'Recognizing PDF…',
     pdfDone:    'PDF recognized',
-    pdfJsFail:  'Failed to load pdf.js (network required on first use)',
+    pdfJsFail:  'Failed to load local pdf.js',
     pdfNoScore: 'No score tokens found in the PDF text layer — scanned or graphics-only scores need OCR / a vision model',
     pdfHeader:  n => '# Recognized from PDF: ' + n + ' (verify rhythm & hands)',
     pdfPage:    p => '# Page ' + p,
@@ -389,7 +389,7 @@ const I18N = {
     dirtyConfirm: '编辑区有未保存的改动，切换将丢弃这些改动，继续？',
     pdfLoading: '正在识别 PDF…',
     pdfDone:    'PDF 识别完成',
-    pdfJsFail:  'pdf.js 加载失败（首次使用需联网）',
+    pdfJsFail:  '本地 pdf.js 加载失败',
     pdfNoScore: '未在 PDF 文本层找到乐谱记号——扫描件或纯图形谱需要 OCR/视觉模型',
     pdfHeader:  n => '# 从 PDF 识别：' + n + '（请核对节奏与左右手）',
     pdfPage:    p => '# 第 ' + p + ' 页',
@@ -968,8 +968,8 @@ document.getElementById('btnApply').addEventListener('click', () => applyScore()
  *   4. quantize x onto the 8th-note grid (grid step = smallest x gap);
  *      empty slots become rests
  * Fails only on scanned/rasterized PDFs, which have no text layer.      */
-const PDFJS_URL    = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const PDFJS_URL    = './vendor/pdfjs/pdf.min.js';
+const PDFJS_WORKER = './vendor/pdfjs/pdf.worker.min.js';
 const TOKEN_RE = /^(D|T|S|[1-8])$/i;   // case-insensitive: some glyph variants render lowercase
 const MIN_ROW_TOKENS = 3;   // rows with fewer tokens are treated as junk
 const ROW_Y_TOL = 4;        // y tolerance when clustering tokens into a row

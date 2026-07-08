@@ -27,6 +27,9 @@ export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH"
 
 cd android-app
 cp ../handpan-player.html www/index.html
+mkdir -p www/vendor/pdfjs
+cp ../vendor/pdfjs/pdf.min.js www/vendor/pdfjs/pdf.min.js
+cp ../vendor/pdfjs/pdf.worker.min.js www/vendor/pdfjs/pdf.worker.min.js
 npx cap copy android
 cd android
 ./gradlew assembleDebug
@@ -52,7 +55,8 @@ $ANDROID_HOME/platform-tools/adb install -r android/app/build/outputs/apk/debug/
 
 - 这是 **debug** 签名的 APK，仅用于自己安装测试。要发布到应用商店需要生成正式签名密钥并构建
   release 包（`./gradlew assembleRelease`），目前没有配置。
-- 应用需要 `INTERNET` 权限（`AndroidManifest.xml` 已默认包含），因为"导入 PDF 识谱"功能会从
-  CDN 按需加载 pdf.js；其余功能（播放、乐谱编辑、曲库）完全离线可用。
+- PDF.js 随包放在 `vendor/pdfjs/`，PDF 识谱不会连接 CDN，也不会上传用户选择的 PDF 文件。
+  其余功能（播放、乐谱编辑、曲库）同样离线可用。`AndroidManifest.xml` 目前仍保留 Capacitor
+  默认生成的 `INTERNET` 权限。
 - `node_modules/`、`android/build/`、`android/app/build/`、`android/.gradle/`、
   `android/local.properties` 已在 `.gitignore` 里排除，不会被提交。

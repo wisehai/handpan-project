@@ -1,3 +1,4 @@
 test/
-.claude/
+.claude/*
+!.claude/settings.json
 node_modules/

@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/alwin/Documents/handpan_project/scripts/check-sw-cache-bump.sh",
+            "if": "Bash(git commit *)",
+            "statusMessage": "Checking sw.js CACHE_NAME was bumped..."
+          }
+        ]
+      }
+    ]
+  }
+}

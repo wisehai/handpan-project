@@ -55,7 +55,8 @@
       max(20px, calc(env(safe-area-inset-left, 0px) + 6px));}
 
   .wrap{max-width:1100px;margin:0 auto;}
-  header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:6px;}
+  header{display:flex;flex-direction:column;gap:2px;margin-bottom:6px;}
+  .title-row{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
   h1{font-size:26px;font-weight:600;letter-spacing:.04em;}
   h1 em{font-style:normal;color:var(--brass);}
   .sub{color:var(--muted);font-size:13px;letter-spacing:.06em;}
@@ -200,9 +201,11 @@
 <button id="btnImmersive" class="immersive-toggle" data-i18n="immersive">⛶ Focus</button>
 <div class="wrap">
   <header>
-    <h1 data-i18n="title">Wise <em>Pan</em></h1>
+    <div class="title-row">
+      <h1 data-i18n="title">Wise <em>Pan</em></h1>
+      <button id="langBtn" class="lang" aria-label="Switch language / 切换语言">中</button>
+    </div>
     <span class="sub" data-i18n="subtitle">Your practice partner</span>
-    <button id="langBtn" class="lang" aria-label="Switch language / 切换语言">中</button>
   </header>
 
   <div class="grid">

@@ -903,7 +903,7 @@ function visLoop(){
 }
 
 function startFrom(evIdx){
-  if (events.length === 0){ statusEl.textContent = tr('emptyScore'); return; }
+  if (events.length === 0){ setStatus('emptyScore'); return; }
   ensureCtx();
   stopPlay(true);
   playing = true;
@@ -915,8 +915,7 @@ function startFrom(evIdx){
   timer = setInterval(scheduler, TIMER_MS);
   requestAnimationFrame(visLoop);
   btnPlay.textContent = tr('pause');
-  statusEl.className = 'status';
-  statusEl.textContent = tr('playingAt', bpmSlider.value);
+  setStatus('playingAt', bpmSlider.value);
 }
 
 function stopPlay(silent){
@@ -927,7 +926,7 @@ function stopPlay(silent){
   if (pos >= events.length) pos = 0;   // finished naturally -> next Play starts over
   btnPlay.textContent = tr('play');
   trackView.querySelectorAll('.col.now').forEach(n => n.classList.remove('now'));
-  if (!silent){ statusEl.className = 'status'; statusEl.textContent = tr('stopped'); }
+  if (!silent){ setStatus('stopped'); }
 }
 
 /* ============================ Wire up UI ============================= */
@@ -935,7 +934,7 @@ btnPlay.addEventListener('click', () => { playing ? stopPlay() : startFrom(pos);
 
 bpmSlider.addEventListener('input', () => {
   document.getElementById('bpmVal').textContent = bpmSlider.value;
-  if (playing) statusEl.textContent = tr('playingAt', bpmSlider.value);
+  if (playing) setStatus('playingAt', bpmSlider.value);
 });
 volSlider.addEventListener('input', () => {
   document.getElementById('volVal').textContent = volSlider.value + '%';
@@ -943,17 +942,28 @@ volSlider.addEventListener('input', () => {
 });
 
 const scoreText = document.getElementById('scoreText');
-function applyScore(msg){
-  stopPlay(true);
-  parseScore(scoreText.value);
-  pos = 0;   // old resume position no longer maps to the freshly parsed score
+let lastStatus = null;   // how the status bar text was generated, so setLang() can redo it in the new language
+function setStatus(key, ...args){
+  statusEl.className = 'status';
+  statusEl.textContent = tr(key, ...args);
+  lastStatus = { key, args };
+}
+function renderApplyResult(msgKey, args){
   if (parseWarnings.length){
     statusEl.className = 'status warn';
     statusEl.textContent = '⚠ ' + parseWarnings.join('; ');
   } else {
     statusEl.className = 'status';
+    const msg = msgKey ? tr(msgKey, ...args) : '';
     statusEl.textContent = (msg ? msg + ' · ' : '') + tr('slotCount', events.length);
   }
+  lastStatus = { apply: true, msgKey, args };
+}
+function applyScore(msgKey, ...args){
+  stopPlay(true);
+  parseScore(scoreText.value);
+  pos = 0;   // old resume position no longer maps to the freshly parsed score
+  renderApplyResult(msgKey, args);
 }
 document.getElementById('btnApply').addEventListener('click', () => applyScore());
 
@@ -1161,15 +1171,15 @@ document.getElementById('btnPdf').addEventListener('click', () => pdfFile.click(
 pdfFile.addEventListener('change', async () => {
   const f = pdfFile.files[0];
   if (!f) return;
-  statusEl.className = 'status';
-  statusEl.textContent = tr('pdfLoading');
+  setStatus('pdfLoading');
   try {
     scoreText.value = await recognizePdf(f);
-    applyScore(tr('pdfDone'));
+    applyScore('pdfDone');
     dirty = true;   // recognized score isn't in the library yet — guard against accidental discard
   } catch (err){
     statusEl.className = 'status warn';
-    statusEl.textContent = '⚠ ' + err.message;
+    statusEl.textContent = '⚠ ' + err.message;   // raw error text, not an i18n key — can't be regenerated on language switch
+    lastStatus = null;
   }
   pdfFile.value = '';
 });
@@ -1251,7 +1261,7 @@ function loadSelected(){
   const text = selIsBuiltin() ? BUILTINS[selName()] : libRead()[selName()];
   if (text == null) return;
   scoreText.value = text;
-  applyScore(tr('loaded', selName()));
+  applyScore('loaded', selName());
   dirty = false;
 }
 
@@ -1288,8 +1298,7 @@ function commitSave(){
   dirty = false;
   refreshLib('u:' + n);
   prevSel = libSel.value;
-  statusEl.className = 'status';
-  statusEl.textContent = tr('saved', n);
+  setStatus('saved', n);
 }
 document.getElementById('btnSaveOk').addEventListener('click', commitSave);
 document.getElementById('btnSaveCancel').addEventListener('click', () => saveDlg.close());
@@ -1315,8 +1324,7 @@ btnLibDel.addEventListener('click', () => {
   refreshLib('b:' + Object.keys(BUILTINS)[0]);
   prevSel = libSel.value;
   loadSelected();
-  statusEl.className = 'status';
-  statusEl.textContent = tr('deleted', n);
+  setStatus('deleted', n);
 });
 
 /* ==================== Language toggle ================================ */
@@ -1334,6 +1342,14 @@ function setLang(l){
   const s = store(); if (s) s.setItem('handpan_lang', l);
   refreshLib();      // optgroup labels
   renderTrack();     // column tooltips
+  if (lastStatus){    // status bar text was baked in the old language — regenerate it
+    if (lastStatus.apply){
+      parseScore(scoreText.value);   // re-derive parseWarnings in the new language
+      renderApplyResult(lastStatus.msgKey, lastStatus.args);
+    } else {
+      setStatus(lastStatus.key, ...lastStatus.args);
+    }
+  }
 }
 langBtn.addEventListener('click', () => setLang(lang === 'zh' ? 'en' : 'zh'));
 

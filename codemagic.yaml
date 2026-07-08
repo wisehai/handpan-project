@@ -30,6 +30,10 @@ workflows:
       - name: Add iOS platform (regenerated fresh on every build — see ios-app/README.md)
         script: |
           cd ios-app && npx cap add ios
+      - name: Restrict target to iPhone only (Capacitor's default template is Universal)
+        script: |
+          cd ios-app/ios/App
+          sed -i '' 's/TARGETED_DEVICE_FAMILY = "1,2";/TARGETED_DEVICE_FAMILY = "1";/g' App.xcodeproj/project.pbxproj
       - name: Generate app icons from assets/
         script: |
           cd ios-app && npx capacitor-assets generate --ios

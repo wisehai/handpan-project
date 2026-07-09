@@ -9,7 +9,7 @@ repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 cd "$repo_root"
 
 changed=$(git diff --cached --name-only -- \
-  handpan-player.html manifest.webmanifest \
+  index.html handpan-player.html manifest.webmanifest \
   icon-180.png icon-192.png icon-512.png \
   vendor/pdfjs/pdf.min.js vendor/pdfjs/pdf.worker.min.js \
   2>/dev/null || true)

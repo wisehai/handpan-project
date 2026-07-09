@@ -1,8 +1,9 @@
 // Minimal offline cache for the handpan app itself. Bump CACHE_NAME whenever
 // the cached files change so clients pick up the new version instead of
 // being stuck on a stale copy forever.
-const CACHE_NAME = 'handpan-v12';
+const CACHE_NAME = 'handpan-v13';
 const PRECACHE = [
+  './index.html',
   './handpan-player.html',
   './manifest.webmanifest',
   './icon-180.png',
@@ -28,8 +29,13 @@ self.addEventListener('activate', e => {
 
 // Same-origin: cache-first (app and bundled PDF import work fully offline once loaded once).
 self.addEventListener('fetch', e => {
-  if (new URL(e.request.url).origin !== location.origin) return;
+  const url = new URL(e.request.url);
+  if (url.origin !== location.origin) return;
+  // Directory requests (e.g. the bare "/handpan-project/" README link) never match a precached
+  // URL by exact path — the browser requests the directory, not "index.html" — so redirect the
+  // cache lookup to this directory's index.html, same as a static file server's default document.
+  const cacheKey = url.pathname.endsWith('/') ? url.origin + url.pathname + 'index.html' : e.request;
   e.respondWith(
-    caches.match(e.request).then(hit => hit || fetch(e.request))
+    caches.match(cacheKey).then(hit => hit || fetch(e.request))
   );
 });

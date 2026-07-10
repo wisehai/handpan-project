@@ -436,19 +436,21 @@ function safeConfirm(msg){
  * 9 at the top of the outer ring; 10 and 11 are two small inner pads above
  * the ding (`r` overrides the ring radius, `small` shrinks them).           */
 const NOTES = {
-  'D': { name:'D3', freq:146.83, ding:true },
-  'T': { name:'T',  freq:293.66, shoulder:true },  // D4 attack over a D3 tail — see TIMBRE
-  '1': { name:'A3',  freq:220.00, angle:160 },
-  '2': { name:'Bb3', freq:233.08, angle:200 },
-  '3': { name:'C4',  freq:261.63, angle:120 },
-  '4': { name:'D4',  freq:293.66, angle:240 },
-  '5': { name:'E4',  freq:329.63, angle: 80 },
-  '6': { name:'F4',  freq:349.23, angle:280 },
-  '7': { name:'G4',  freq:392.00, angle: 40 },
-  '8': { name:'A4',  freq:440.00, angle:320 },
-  '9': { name:'Bb4', freq:466.16, angle:  0 },
-  '10': { name:'C5', freq:523.25, angle:327, r:95, small:true },
-  '11': { name:'D5', freq:587.33, angle: 33, r:95, small:true },
+  // Frequencies follow the stable peaks shared by both owner recordings.
+  'D': { name:'D3', freq:147.01, ding:true },
+  'T': { name:'T',  freq:293.15, shoulder:true },  // D4 shoulder with D3/A4 shell modes
+  '1': { name:'A3',  freq:219.32, angle:160 },
+  '2': { name:'Bb3', freq:233.33, angle:200 },
+  '3': { name:'C4',  freq:261.30, angle:120 },
+  '4': { name:'D4',  freq:293.84, angle:240 },
+  '5': { name:'E4',  freq:328.95, angle: 80 },
+  '6': { name:'F4',  freq:349.56, angle:280 },
+  '7': { name:'G4',  freq:390.81, angle: 40 },
+  '8': { name:'A4',  freq:439.85, angle:320 },
+  // The recordings show C5/D5/E5 here; the previous table was one whole tone low.
+  '9': { name:'C5', freq:523.29, angle:  0 },
+  '10': { name:'D5', freq:587.35, angle:327, r:95, small:true },
+  '11': { name:'E5', freq:658.10, angle: 33, r:95, small:true },
 };
 
 /* ---------- Default score ---------------------------------------------
@@ -536,7 +538,7 @@ function buildPan(){
     'pointer-events':'none'}, pan);
   el('circle', {cx:CX, cy:CY, r:214, fill:'none', stroke:'#161d24',
     'stroke-width':1.5, opacity:.5, 'pointer-events':'none'}, pan);
-  const slapTrig = e => { e.preventDefault(); ensureCtx(); playEventNow([{key:'S', hand:null}]); };
+  const slapTrig = e => { e.preventDefault(); ensureCtx(); playEventNow([{key:'S', hand:null}], velocityFromPointer(e)); };
   shell.addEventListener('pointerdown', slapTrig);
   shell.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();slapTrig(e);} });
 
@@ -552,7 +554,7 @@ function buildPan(){
   el('text', {x:CX + 66, y:DING_CY + 56,
     class:'pad-num', 'text-anchor':'middle', 'pointer-events':'none'}, pan)
     .textContent = 'T';
-  const tTrig = e => { e.preventDefault(); ensureCtx(); playEventNow([{key:'T', hand:null}]); };
+  const tTrig = e => { e.preventDefault(); ensureCtx(); playEventNow([{key:'T', hand:null}], velocityFromPointer(e)); };
   tRing.addEventListener('pointerdown', tTrig);
   tRing.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();tTrig(e);} });
   padEls['T'] = {g:tRing, cx:CX, cy:DING_CY, r:T_R, ring:true};
@@ -579,7 +581,7 @@ function buildPan(){
     el('text', {class:'pad-num', x:cx, y:cy,
                 'text-anchor':'middle', 'dominant-baseline':'middle'}, g)
       .textContent = n.ding ? 'Ding' : key;
-    const trigger = e => { e.preventDefault(); ensureCtx(); playEventNow([{key, hand:null}]); };
+    const trigger = e => { e.preventDefault(); ensureCtx(); playEventNow([{key, hand:null}], velocityFromPointer(e)); };
     g.addEventListener('pointerdown', trigger);
     g.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();trigger(e);} });
     padEls[key] = {g, cx, cy, r: Math.max(rx, ry)};
@@ -621,16 +623,133 @@ function flashPad(key, hand){
 }
 
 /* ============================ Audio engine =========================== */
-let actx = null, master = null;
+let actx = null, master = null, sampleBus = null, tailBus = null;
+let roomWet = null, metronomeBus = null;
+const SAMPLE_MANIFEST_URL = './audio/handpan/samples.json';
+let sampleManifest = null, sampleEncoded = new Map(), sampleBuffers = new Map();
+let sampleDecodeContext = null, sampleDecodePromise = null;
+const roundRobin = {}, recentHitTimes = [], sampleVoices = [], tailVoices = [];
+
+/* Fetch encoded assets eagerly, but create/decode AudioBuffers only after a
+ * user gesture has supplied an AudioContext. Direct file:// launches simply
+ * keep the synthesis fallback; hosted/PWA builds use the recorded samples. */
+const samplePreloadPromise = (async () => {
+  try {
+    const response = await fetch(SAMPLE_MANIFEST_URL);
+    if (!response.ok) throw new Error(`sample manifest HTTP ${response.status}`);
+    sampleManifest = await response.json();
+    await Promise.all(sampleManifest.sprites.map(async sprite => {
+      const audio = await fetch(sprite.url);
+      if (!audio.ok) throw new Error(`${sprite.url} HTTP ${audio.status}`);
+      sampleEncoded.set(sprite.id, await audio.arrayBuffer());
+    }));
+    return true;
+  } catch (error){
+    console.warn('Handpan samples unavailable; using synthesis fallback.', error);
+    return false;
+  }
+})();
+
+async function prepareSampleBuffers(ctx = actx){
+  if (!ctx || !(await samplePreloadPromise)) return false;
+  if (sampleDecodeContext === ctx && sampleBuffers.size === sampleManifest.sprites.length) return true;
+  if (sampleDecodeContext === ctx && sampleDecodePromise) return sampleDecodePromise;
+  sampleDecodeContext = ctx;
+  sampleBuffers = new Map();
+  sampleDecodePromise = (async () => {
+    // Medium first: normal taps and score playback become sampled as soon as possible.
+    const sprites = [...sampleManifest.sprites].sort((a, b) =>
+      (a.layer === 'medium' ? -1 : 0) - (b.layer === 'medium' ? -1 : 0));
+    for (const sprite of sprites){
+      const encoded = sampleEncoded.get(sprite.id);
+      if (!encoded) continue;
+      sampleBuffers.set(sprite.id, await ctx.decodeAudioData(encoded.slice(0)));
+    }
+    return sampleBuffers.size === sampleManifest.sprites.length;
+  })().catch(error => {
+    console.warn('Handpan sample decode failed; using synthesis fallback.', error);
+    return false;
+  });
+  return sampleDecodePromise;
+}
+
+/* Short stereo reflections give isolated notes air. Hit-density automation
+ * below reduces this send during songs, so tails never swamp the next beat. */
+function makeRoomImpulse(ctx){
+  const seconds = 1.65, length = Math.floor(ctx.sampleRate * seconds);
+  const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+  let seed = 0x51f15e;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0x100000000 * 2 - 1;
+  };
+  const early = [[.019,.46],[.031,.32],[.047,.25],[.071,.18],[.103,.11]];
+  for (let ch = 0; ch < 2; ch++){
+    const data = impulse.getChannelData(ch);
+    let smooth = 0;
+    for (let i = Math.floor(ctx.sampleRate * .018); i < length; i++){
+      const t = i / ctx.sampleRate;
+      smooth = smooth * .76 + random() * .24;
+      const bloom = Math.min(1, (t - .018) / .055);
+      data[i] = smooth * bloom * Math.exp(-t / .42) * .16;
+    }
+    for (let n = 0; n < early.length; n++){
+      const [time, amp] = early[n];
+      const offset = ch ? ((n % 2 ? 1 : -1) * .0027) : 0;
+      const i = Math.max(0, Math.floor((time + offset) * ctx.sampleRate));
+      if (i < length) data[i] += amp * (n % 2 ? -1 : 1);
+    }
+  }
+  return impulse;
+}
+
+function createOutputGraph(ctx, gain){
+  sampleBus = ctx.createGain();
+  tailBus = ctx.createGain(); tailBus.gain.value = 1;
+  const instrumentMix = ctx.createGain();
+  sampleBus.connect(instrumentMix); tailBus.connect(instrumentMix);
+
+  const sum = ctx.createGain();
+  const dry = ctx.createGain(); dry.gain.value = .97;
+  instrumentMix.connect(dry); dry.connect(sum);
+
+  const roomHighpass = ctx.createBiquadFilter();
+  roomHighpass.type = 'highpass'; roomHighpass.frequency.value = 180; roomHighpass.Q.value = .55;
+  const roomAir = ctx.createBiquadFilter();
+  roomAir.type = 'highshelf'; roomAir.frequency.value = 6500; roomAir.gain.value = 1;
+  const convolver = ctx.createConvolver(); convolver.buffer = makeRoomImpulse(ctx);
+  roomWet = ctx.createGain(); roomWet.gain.value = .15;
+  instrumentMix.connect(roomHighpass); roomHighpass.connect(roomAir);
+  roomAir.connect(convolver); convolver.connect(roomWet); roomWet.connect(sum);
+
+  // Compress only after dry/tail/room summing. One hit can no longer duck the
+  // whole instrument before it reaches the reverb, which caused mix pumping.
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -7; comp.knee.value = 10; comp.ratio.value = 2.2;
+  comp.attack.value = .020; comp.release.value = .18;
+  sum.connect(comp);
+
+  const headroom = ctx.createGain(); headroom.gain.value = .8;
+  comp.connect(headroom);
+  master = ctx.createGain(); master.gain.value = gain;
+  headroom.connect(master);
+
+  // The metronome bypasses instrument reverb/compression, but shares volume
+  // and the final safety stage.
+  metronomeBus = ctx.createGain(); metronomeBus.gain.value = .8;
+  metronomeBus.connect(master);
+  const safety = ctx.createDynamicsCompressor();
+  safety.threshold.value = -1.5; safety.knee.value = 0; safety.ratio.value = 20;
+  safety.attack.value = .001; safety.release.value = .08;
+  master.connect(safety); safety.connect(ctx.destination);
+  return master;
+}
 
 function ensureCtx(){
   if (!actx){
     actx = new (window.AudioContext || window.webkitAudioContext)();
-    master = actx.createGain();
-    master.gain.value = volSlider.value / 100 * 0.85;
-    const comp = actx.createDynamicsCompressor();
-    comp.threshold.value = -14; comp.ratio.value = 4;
-    master.connect(comp); comp.connect(actx.destination);
+    createOutputGraph(actx, volSlider.value / 100 * 0.85);
+    prepareSampleBuffers();
     unlockIosSilentSwitch();
   }
   if (actx.state === 'suspended') actx.resume();
@@ -649,131 +768,232 @@ function unlockIosSilentSwitch(){
 
 /* Per-note timbre, measured from the user's own pan (test/r1.m4a, r2.m4a:
  * FFT partial peaks + per-band decay tracking, two takes cross-checked).
- * partials: [freq mult, peak amp rel. to fundamental, decay as fraction of
- * dur, optional attack seconds (default 6 ms)].
- * Octave-dominant fields (4, 7) are capped below the raw FFT ratios (3x, 7x)
- * so they read as character, not as the octave note itself.
- * D: in the recorded tail (1-2s) the 3x/4x partials (A4/D5) ring on and even
- * outlast the fundamental — that sustained chord-hum is the ding's warmth.
- * T: measured hierarchy is 1.5x (A4) dominant with a ~120 ms bloom, 0.5x
- * (D3) strong and lasting, 1x (D4) secondary, plus a fast 5.3x metallic
- * shimmer (~1554 Hz).                                                     */
+ * partials: [frequency multiplier, peak amplitude, decay fraction, optional
+ * attack seconds]. Slightly non-integer multipliers preserve measured mode
+ * splits/beating instead of forcing every component onto a perfect harmonic.
+ * Octave-heavy fields bloom after the fundamental, which keeps their strike
+ * warm while their long tail develops the characteristic metallic halo.     */
 const TIMBRE = {
-  'D':  { dur:4.8, partials:[[1,1,1],[2,.55,1],[3,.33,1.6],[4,.10,1.6]] },
-  'T':  { dur:4.5, partials:[[.5,.9,.9],[1,.55,.7],[1.5,1,1,.12],[2,.15,.5],[5.3,.12,.15]] },
-  '1':  { dur:4.2, partials:[[1,1,1],[2,.22,.85],[3,.10,.5]] },
-  '2':  { dur:4.2, partials:[[1,1,1],[2,.10,.8],[3,.04,.5]] },
-  '3':  { dur:4.2, partials:[[1,1,1],[2,.60,.7],[3,.15,.4],[4,.05,.25]] },
-  '4':  { dur:4.2, partials:[[.5,.15,.9],[1,1,1],[2,1.2,.6],[3,.18,.4]] },
-  '5':  { dur:4.2, partials:[[1,1,1],[2,.27,.7],[3,.07,.4]] },
-  '6':  { dur:4.2, partials:[[1,1,1],[2,.15,.7],[3,.04,.4]] },
-  '7':  { dur:4.2, partials:[[.5,.12,.8],[1,1,1],[1.5,.12,.5],[2,1.8,.7],[3,.15,.4]] },
-  '8':  { dur:4.2, partials:[[1,1,1],[2,.11,.7],[3,.02,.4]] },
-  '9':  { dur:3.8, partials:[[1,1,1],[2,.03,.6]] },
-  '10': { dur:3.8, partials:[[.5,.12,.8],[1,1,1],[2,.02,.6]] },
-  '11': { dur:3.8, partials:[[.5,.05,.8],[1,1,1],[2,.03,.6]] },
+  // Ding fallback keeps its 147 Hz body forward; recorded samples handle the real attack.
+  'D':  { dur:5.8, partials:[[1,1,1],[1.993,.46,.95,.055],[3.006,.32,1.25,.20],[4.006,.09,1.15,.28]] },
+  'T':  { dur:6.4, partials:[[.502,.42,.85,.025],[1,.32,.70,.015],[1.508,1,1,.012],[2.009,.13,.45],[5.30,.08,.12]] },
+  '1':  { dur:4.8, partials:[[1,1,1],[1.994,.32,.90,.018],[2.015,.20,.75,.025],[3.004,.10,.45,.012]] },
+  '2':  { dur:4.3, partials:[[1,1,1],[1.998,.32,.82,.018],[3.001,.09,.50,.012]] },
+  '3':  { dur:4.7, partials:[[1,1,1],[2.003,1.05,.78,.070],[2.999,.40,.50,.050],[4.003,.28,.35,.060]] },
+  '4':  { dur:7.0, partials:[[.501,.08,.80,.018],[1,1,1],[2.004,1.55,.60,.045],[3.001,.08,.40,.020]] },
+  '5':  { dur:4.1, partials:[[1,1,1],[2.001,.66,.66,.060],[3.018,.08,.35,.035]] },
+  '6':  { dur:4.7, partials:[[1,1,1],[2.001,.88,.66,.060],[3.007,.08,.35,.035]] },
+  '7':  { dur:5.4, partials:[[1,1,1],[2.003,1.75,.66,.050],[3.001,.05,.35,.020]] },
+  '8':  { dur:5.2, partials:[[1,1,1],[1.999,.33,.66,.040]] },
+  '9':  { dur:6.2, partials:[[.841,.13,.45,.020],[.914,.12,.50,.018],[1,1,1],[1.123,.13,.50,.025],[1.999,.18,.45,.035]] },
+  '10': { dur:5.2, partials:[[.752,.12,.40,.018],[.891,.15,.55,.020],[1,1,1],[1.999,.20,.40,.035]] },
+  '11': { dur:7.0, partials:[[.672,.12,.35,.018],[.892,.16,.50,.020],[1,1,1],[2.001,.10,.35,.035]] },
 };
 
-/* Tone field / ding / shoulder: additive partials per TIMBRE, each with its
- * own envelope, plus a strike-noise burst and a faint ~76 Hz body resonance
- * (Helmholtz thump — present on every strike in the recordings).
- * Slap (S): unpitched — body thump + band-passed noise crack.           */
+const VOICE_PAN = {'1':.20,'2':-.20,'3':.27,'4':-.27,'5':.30,'6':-.30,
+  '7':.22,'8':-.22,'9':0,'10':-.12,'11':.12,'D':0,'T':0,'S':0};
+
+function connectVoice(node, key, bus){
+  if (!actx.createStereoPanner){ node.connect(bus); return; }
+  const panner = actx.createStereoPanner();
+  panner.pan.value = VOICE_PAN[key] || 0;
+  node.connect(panner); panner.connect(bus);
+}
+
+function holdParam(param, t){
+  if (param.cancelAndHoldAtTime) param.cancelAndHoldAtTime(t);
+  else { const value = param.value; param.cancelScheduledValues(t); param.setValueAtTime(value, t); }
+}
+
+function updateHitDensity(t){
+  while (recentHitTimes.length && recentHitTimes[0] < t - .8) recentHitTimes.shift();
+  recentHitTimes.push(t);
+  const count = recentHitTimes.length;
+  const wet = count <= 1 ? .15 : (count <= 3 ? .08 : .045);
+  const tail = count <= 1 ? 1 : (count <= 3 ? .8 : .6);
+  for (const [param, target, resting] of [[roomWet.gain, wet, .15], [tailBus.gain, tail, 1]]){
+    holdParam(param, t);
+    param.setTargetAtTime(target, t, .035);
+    param.setTargetAtTime(resting, t + .82, .22);
+  }
+}
+
+function velocityFromPointer(event){
+  const pressure = Number(event && event.pressure);
+  if (pressure > 0 && pressure !== .5) return Math.max(.5, Math.min(1, .52 + pressure * .48));
+  return .85;
+}
+
+function layerForVelocity(vel){
+  if (vel < .68) return 'soft';
+  if (vel > .9) return 'strong';
+  return 'medium';
+}
+
+function trimVoices(list, t, limit){
+  for (let i = list.length - 1; i >= 0; i--) if (list[i].ended || list[i].end <= t) list.splice(i, 1);
+  while (list.length >= limit){
+    const voice = list.shift();
+    if (!voice || voice.ended) continue;
+    holdParam(voice.gain.gain, t);
+    voice.gain.gain.setTargetAtTime(.0001, t, .008);
+    for (const source of voice.sources) try { source.stop(t + .03); } catch (_) {}
+    voice.ended = true;
+  }
+}
+
+function chokeRepeatedSample(key, t){
+  for (const voice of sampleVoices){
+    if (voice.key !== key || voice.ended || voice.end <= t) continue;
+    holdParam(voice.gain.gain, t);
+    voice.gain.gain.setTargetAtTime(.0001, t, .007);
+    try { voice.sources[0].stop(t + .025); } catch (_) {}
+    voice.ended = true;
+  }
+}
+
+function playSampleHit(key, t, vel){
+  if (!sampleManifest || !sampleBuffers.size) return false;
+  const wantedLayer = layerForVelocity(vel);
+  const rr = roundRobin[`${wantedLayer}:${key}`] === 'a' ? 'b' : 'a';
+  roundRobin[`${wantedLayer}:${key}`] = rr;
+  let sprite = sampleManifest.sprites.find(s => s.layer === wantedLayer && s.roundRobin === rr && sampleBuffers.has(s.id));
+  // Medium is the first decoded layer and the neutral fallback for partial loads.
+  if (!sprite) sprite = sampleManifest.sprites.find(s => s.layer === 'medium' && sampleBuffers.has(s.id));
+  if (!sprite || !sprite.cues[key]) return false;
+  const cue = sprite.cues[key], buffer = sampleBuffers.get(sprite.id);
+  chokeRepeatedSample(key, t);
+  trimVoices(sampleVoices, t, 24);
+  const source = actx.createBufferSource(); source.buffer = buffer;
+  const gain = actx.createGain(); gain.gain.value = 1;
+  source.connect(gain); connectVoice(gain, key, sampleBus);
+  const voice = {key, gain, sources:[source], end:t + cue.duration, ended:false};
+  sampleVoices.push(voice);
+  source.onended = () => { voice.ended = true; };
+  source.start(t, cue.offset, cue.duration);
+  return true;
+}
+
+function randomizePhase(osc){
+  const phase = Math.random() * Math.PI * 2;
+  osc.setPeriodicWave(actx.createPeriodicWave(
+    new Float32Array([0, Math.sin(phase)]),
+    new Float32Array([0, Math.cos(phase)]),
+    {disableNormalization:true}
+  ));
+}
+
+/* Recorded sprites own the first 1-3 seconds. These quiet modal voices cross
+ * in underneath them; the full envelopes are also a no-network/file:// fallback. */
 function playHit(key, t, vel){
-  if (key === 'S'){ playSlap(t, vel); return; }
+  updateHitDensity(t);
+  const sampled = playSampleHit(key, t, vel);
+  if (key === 'S'){ playSlap(t, vel, sampled); return; }
+  playTonal(key, t, vel, sampled);
+}
+
+function playTonal(key, t, vel, tailOnly){
   const note = NOTES[key], tim = TIMBRE[key];
   if (!note || !tim) return;
 
   const dur = tim.dur, partials = tim.partials;
-  const noiseF = note.freq * (note.shoulder ? 3 : 2.5);
-  const noiseAmp = note.shoulder ? 0.30 : 0.35;
-
-  // static hit gain, normalized so octave-heavy notes (4, 7) don't jump out
   const ampSum = partials.reduce((s, p) => s + p[1], 0);
   const g = actx.createGain();
-  g.gain.value = 0.5 * vel * Math.min(1, 1.9 / ampSum);
-  g.connect(master);
+  g.gain.value = (tailOnly ? .14 : .5) * vel * Math.min(1, 1.9 / ampSum);
+  connectVoice(g, key, tailOnly ? tailBus : sampleBus);
+  const sources = [], tailStart = key === 'D' ? 1.05 : (key === 'T' ? .42 : .50);
+  let voiceEnd = t;
 
   for (const [mult, amp, decayFrac, attack] of partials){
+    const end = t + dur * decayFrac;
+    let peakTime;
+    if (tailOnly){
+      peakTime = Math.min(t + tailStart + (key === 'D' ? .68 : .46), end - .08);
+      if (peakTime <= t + tailStart) continue; // fast shimmer already exists in the sample
+    } else peakTime = t + (attack || .006);
     const o = actx.createOscillator();
-    o.type = 'sine';
+    randomizePhase(o);
     o.frequency.value = note.freq * mult;
-    o.detune.value = (Math.random() * 6) - 3;
+    o.detune.value = (Math.random() * .8) - .4;
     const og = actx.createGain();
     og.gain.setValueAtTime(0.0001, t);
-    og.gain.exponentialRampToValueAtTime(amp, t + (attack || 0.006));
-    og.gain.exponentialRampToValueAtTime(0.0001, t + dur * decayFrac);
+    if (tailOnly) og.gain.setValueAtTime(.0001, t + tailStart);
+    og.gain.exponentialRampToValueAtTime(amp, peakTime);
+    if (!tailOnly) og.gain.exponentialRampToValueAtTime(amp * .78, Math.min(end - .02, t + Math.max(.16, (attack || .006) + .11)));
+    og.gain.exponentialRampToValueAtTime(0.0001, end);
     o.connect(og); og.connect(g);
-    o.start(t); o.stop(t + dur * Math.max(1, decayFrac) + 0.1);
+    o.start(t); o.stop(end + .1);
+    sources.push(o); voiceEnd = Math.max(voiceEnd, end);
   }
 
-  // body resonance: soft low hum from the shell cavity (~83 Hz measured)
-  const bo = actx.createOscillator();
-  bo.type = 'sine';
-  bo.frequency.value = 83 + (Math.random() * 8) - 4;
-  const bg = actx.createGain();
-  bg.gain.setValueAtTime(0.0001, t);
-  bg.gain.exponentialRampToValueAtTime(note.ding ? 0.10 : 0.07, t + 0.008);
-  bg.gain.exponentialRampToValueAtTime(0.0001, t + 1.0);
-  bo.connect(bg); bg.connect(g);
-  bo.start(t); bo.stop(t + 1.1);
+  if (tailOnly){
+    trimVoices(tailVoices, t, 16);
+    tailVoices.push({key, gain:g, sources, end:voiceEnd, ended:false});
+    return;
+  }
 
-  // attack transient: 30 ms band-passed noise burst
-  const nLen = Math.floor(actx.sampleRate * 0.03);
+  // Synthesis fallback: cavity pair and a restrained residual strike.
+  for (const [freq, amp, decay] of [[82.4, note.ding ? .18 : .035, note.ding ? 1.6 : 1.25], [85.3, note.ding ? .12 : .025, note.ding ? 1.3 : 1.0]]){
+    const bo = actx.createOscillator(); randomizePhase(bo); bo.frequency.value = freq;
+    const bg = actx.createGain(); bg.gain.setValueAtTime(.0001, t);
+    bg.gain.exponentialRampToValueAtTime(amp, t + .009);
+    bg.gain.exponentialRampToValueAtTime(.0001, t + decay);
+    bo.connect(bg); bg.connect(g); bo.start(t); bo.stop(t + decay + .1);
+  }
+  const noiseSecs = note.shoulder ? .050 : .038;
+  const nLen = Math.floor(actx.sampleRate * noiseSecs);
   const buf = actx.createBuffer(1, nLen, actx.sampleRate);
   const ch = buf.getChannelData(0);
-  for (let i = 0; i < nLen; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / nLen);
+  for (let i = 0; i < nLen; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / nLen, 1.6);
   const src = actx.createBufferSource(); src.buffer = buf;
-  const bp = actx.createBiquadFilter();
-  bp.type = 'bandpass'; bp.frequency.value = noiseF; bp.Q.value = 1.2;
-  const ng = actx.createGain(); ng.gain.value = noiseAmp * vel;
-  src.connect(bp); bp.connect(ng); ng.connect(g);
+  const knock = actx.createBiquadFilter();
+  knock.type = 'bandpass'; knock.frequency.value = Math.min(1100, note.freq * 1.7); knock.Q.value = .85;
+  const knockGain = actx.createGain(); knockGain.gain.value = note.shoulder ? .22 : .16;
+  const air = actx.createBiquadFilter();
+  air.type = 'bandpass'; air.frequency.value = note.shoulder ? 2200 : 2700; air.Q.value = .75;
+  const airGain = actx.createGain(); airGain.gain.value = note.shoulder ? .5 : (note.freq > 500 ? .025 : .012);
+  src.connect(knock); knock.connect(knockGain); knockGain.connect(g);
+  src.connect(air); air.connect(airGain); airGain.connect(g);
   src.start(t);
 }
 
-/* Slap, matched to the recordings: the 0-80 ms spectrum has two equal ridges
- * (120-300 Hz body knock and 1500-3000 Hz metallic clap) with a deep notch
- * between them at 700-1500 Hz, and the strike leaves the shell's low modes
- * (D3 / C4 / E4) ringing softly afterwards.                               */
-function playSlap(t, vel){
-  // low body knock with a fast downward pitch sweep
-  const o = actx.createOscillator();
-  o.type = 'sine';
-  o.frequency.setValueAtTime(210, t);
-  o.frequency.exponentialRampToValueAtTime(80, t + 0.065);
-  const g = actx.createGain();
-  g.gain.setValueAtTime(0.55 * vel, t);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
-  o.connect(g); g.connect(master);
-  o.start(t); o.stop(t + 0.18);
+function playSlap(t, vel, tailOnly){
+  const slapBus = actx.createGain();
+  slapBus.gain.value = tailOnly ? .5 : .82;
+  connectVoice(slapBus, 'S', tailOnly ? tailBus : sampleBus);
+  if (!tailOnly){
+    const o = actx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(210, t); o.frequency.exponentialRampToValueAtTime(80, t + .065);
+    const g = actx.createGain(); g.gain.setValueAtTime(.55 * vel, t);
+    g.gain.exponentialRampToValueAtTime(.0001, t + .14);
+    o.connect(g); g.connect(slapBus); o.start(t); o.stop(t + .18);
 
-  // two noise bands: low-mid knock + bright metallic clap (notch in between)
-  const mkNoise = (secs, taperPow, freq, q, gain) => {
-    const nLen = Math.floor(actx.sampleRate * secs);
-    const buf = actx.createBuffer(1, nLen, actx.sampleRate);
-    const ch = buf.getChannelData(0);
-    for (let i = 0; i < nLen; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / nLen, taperPow);
-    const src = actx.createBufferSource(); src.buffer = buf;
-    const bp = actx.createBiquadFilter();
-    bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = q;
-    const ng = actx.createGain(); ng.gain.value = gain * vel;
-    src.connect(bp); bp.connect(ng); ng.connect(master);
-    src.start(t);
-  };
-  mkNoise(0.06, 2, 250, 0.9, 0.9);     // body knock
-  mkNoise(0.045, 1.5, 2200, 2.2, 1.6); // metallic clap
+    const mkNoise = (secs, taperPow, freq, q, gain) => {
+      const nLen = Math.floor(actx.sampleRate * secs), buf = actx.createBuffer(1, nLen, actx.sampleRate);
+      const ch = buf.getChannelData(0);
+      for (let i = 0; i < nLen; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / nLen, taperPow);
+      const src = actx.createBufferSource(); src.buffer = buf;
+      const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = q;
+      const ng = actx.createGain(); ng.gain.value = gain * vel;
+      src.connect(bp); bp.connect(ng); ng.connect(slapBus); src.start(t);
+    };
+    mkNoise(.06, 2, 250, .9, .75); mkNoise(.05, 1.35, 2200, 1.4, 1.8);
+  }
 
-  // shell after-ring: the strike leaves the pan's low modes sounding
-  for (const [freq, amp, dec] of [[147.8, 0.05, 0.8], [261.6, 0.03, 0.5], [329.6, 0.025, 0.5]]){
-    const ro = actx.createOscillator();
-    ro.type = 'sine';
-    ro.frequency.value = freq;
-    ro.detune.value = (Math.random() * 6) - 3;
-    const rg = actx.createGain();
-    rg.gain.setValueAtTime(0.0001, t);
-    rg.gain.exponentialRampToValueAtTime(amp * vel, t + 0.012);
-    rg.gain.exponentialRampToValueAtTime(0.0001, t + dec);
-    ro.connect(rg); rg.connect(master);
-    ro.start(t); ro.stop(t + dec + 0.1);
+  const sources = [];
+  for (const [freq, amp, dec] of [[85.3,.16,3.4],[147,.20,3.8],[261.3,.11,3],[329,.09,2.7]]){
+    const ro = actx.createOscillator(); randomizePhase(ro); ro.frequency.value = freq;
+    ro.detune.value = (Math.random() * .8) - .4;
+    const rg = actx.createGain(); rg.gain.setValueAtTime(.0001, t);
+    const peak = tailOnly ? t + .72 : t + .012;
+    if (tailOnly) rg.gain.setValueAtTime(.0001, t + .38);
+    rg.gain.exponentialRampToValueAtTime(amp * vel, peak);
+    rg.gain.exponentialRampToValueAtTime(.0001, t + dec);
+    ro.connect(rg); rg.connect(slapBus); ro.start(t); ro.stop(t + dec + .1); sources.push(ro);
+  }
+  if (tailOnly){
+    trimVoices(tailVoices, t, 16);
+    tailVoices.push({key:'S', gain:slapBus, sources, end:t + 3.8, ended:false});
   }
 }
 
@@ -782,12 +1002,12 @@ function playTick(t, strong){
   o.type = 'square'; o.frequency.value = strong ? 1600 : 1100;
   g.gain.setValueAtTime(0.08, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
-  o.connect(g); g.connect(master);
+  o.connect(g); g.connect(metronomeBus);
   o.start(t); o.stop(t + 0.05);
 }
 
-function playEventNow(hits){
-  for (const h of hits){ playHit(h.key, actx.currentTime, 0.9); flashPad(h.key, h.hand); }
+function playEventNow(hits, vel = .85){
+  for (const h of hits){ playHit(h.key, actx.currentTime, vel); flashPad(h.key, h.hand); }
 }
 
 /* ============================ Score parsing =========================== */

@@ -16,7 +16,7 @@
 
 ## 重新构建 APK
 
-`handpan-player.html` 每次改动后，先同步到 `www/index.html`，再让 Capacitor 把它拷进 Android
+`handpan-player.html` 或 `audio/handpan/` 每次改动后，先同步到 `www/`，再让 Capacitor 把它拷进 Android
 工程，然后才是 Gradle 构建——这三步缺一不可，尤其是前两步，Gradle 自己不会去检查网页源文件变没变：
 
 ```bash
@@ -27,7 +27,8 @@ export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH"
 
 cd android-app
 cp ../handpan-player.html www/index.html
-mkdir -p www/vendor/pdfjs
+mkdir -p www/vendor/pdfjs www/audio/handpan
+cp ../audio/handpan/* www/audio/handpan/
 cp ../vendor/pdfjs/pdf.min.js www/vendor/pdfjs/pdf.min.js
 cp ../vendor/pdfjs/pdf.worker.min.js www/vendor/pdfjs/pdf.worker.min.js
 npx cap copy android
@@ -40,6 +41,8 @@ cd android
 ```bash
 unzip -p android-app/android/app/build/outputs/apk/debug/app-debug.apk assets/public/index.html \
   | diff - handpan-player.html && echo "APK 里的内容和源文件一致"
+unzip -l android-app/android/app/build/outputs/apk/debug/app-debug.apk \
+  | grep 'assets/public/audio/handpan/medium-a.m4a'
 ```
 
 ## 安装到手机
@@ -55,8 +58,8 @@ $ANDROID_HOME/platform-tools/adb install -r android/app/build/outputs/apk/debug/
 
 - 这是 **debug** 签名的 APK，仅用于自己安装测试。要发布到应用商店需要生成正式签名密钥并构建
   release 包（`./gradlew assembleRelease`），目前没有配置。
-- PDF.js 随包放在 `vendor/pdfjs/`，PDF 识谱不会连接 CDN，也不会上传用户选择的 PDF 文件。
-  其余功能（播放、乐谱编辑、曲库）同样离线可用。`AndroidManifest.xml` 目前仍保留 Capacitor
+- 手碟录音采样随包放在 `audio/handpan/`；PDF.js 随包放在 `vendor/pdfjs/`。两者都不依赖网络，
+  PDF 识谱也不会上传用户选择的文件。`AndroidManifest.xml` 目前仍保留 Capacitor
   默认生成的 `INTERNET` 权限。
 - `node_modules/`、`android/build/`、`android/app/build/`、`android/.gradle/`、
   `android/local.properties` 已在 `.gitignore` 里排除，不会被提交。

@@ -8,4 +8,5 @@ android/capacitor-cordova-android-plugins/build/
 # generated copies of ../handpan-player.html (see README's rebuild steps) — not source
 www/index.html
 www/vendor/
+www/audio/
 android/app/src/main/assets/public/index.html

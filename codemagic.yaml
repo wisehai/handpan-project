@@ -20,8 +20,9 @@ workflows:
       - name: Copy web app into ios-app/www
         script: |
           # Ensure target directory exists (git does not track empty dirs)
-          mkdir -p ios-app/www/vendor/pdfjs
+          mkdir -p ios-app/www/vendor/pdfjs ios-app/www/audio/handpan
           cp handpan-player.html ios-app/www/index.html
+          cp audio/handpan/* ios-app/www/audio/handpan/
           cp vendor/pdfjs/pdf.min.js ios-app/www/vendor/pdfjs/pdf.min.js
           cp vendor/pdfjs/pdf.worker.min.js ios-app/www/vendor/pdfjs/pdf.worker.min.js
       - name: Install npm dependencies

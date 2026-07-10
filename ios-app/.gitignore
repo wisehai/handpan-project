@@ -6,4 +6,3 @@ node_modules/
 ios/
 # generated copy of ../handpan-player.html (see README's rebuild steps) — not source
 www/index.html
-www/audio/

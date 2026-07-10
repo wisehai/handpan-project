@@ -8,7 +8,7 @@
 
 ![主界面截图 · Main screen screenshot](docs/screenshot-main.png)
 
-一个手碟的电子仿真软件：SVG 手碟可视化、三力度真实录音采样与 Web Audio 共鸣尾音。
+一个手碟的电子仿真软件：SVG 手碟可视化、Web Audio 实时合成音色。
 支持从 PDF 导入并自动识别曲谱、乐谱可直接编辑修改、播放速度（BPM）可调、节拍器可开关。
 
 ### 在线体验
@@ -20,8 +20,7 @@ PWA 部分）。
 
 ### 本地运行
 
-录音采样需要通过 HTTP 加载。在项目目录运行 `python3 -m http.server 8000`，再打开
-`http://localhost:8000/handpan-player.html`。直接双击 HTML 仍可运行，但会使用合成备用音色。
+直接用浏览器打开`handpan-player.html`
 
 ### 功能
 
@@ -48,7 +47,9 @@ PWA 部分）。
 
 ### 已知限制
 
-首次敲击会初始化并解码录音采样；较旧或内存紧张的设备上，第一次发声可能短暂使用合成备用音色。
+iPhone 侧边物理静音拨片打开时，页面里合成的声音会被系统静音——这是 WebKit 对纯 Web Audio API 输出
+（没有真实 `<audio>`/`<video>` 播放过内容）的平台级限制，目前没有可靠的纯前端绕过方法。使用前请确认
+手机不是静音状态。
 
 ### 项目结构与开发说明
 
@@ -58,8 +59,8 @@ PWA 部分）。
 
 ![主界面截图 · Main screen screenshot](docs/screenshot-main-en.png)
 
-A handpan electronic simulator: SVG visualization, three recorded velocity layers, and Web Audio
-resonance tails. Supports importing and auto-recognizing scores from
+A handpan electronic simulator: SVG handpan
+visualization, real-time Web Audio synthesis. Supports importing and auto-recognizing scores from
 PDF, directly editable scores, adjustable playback speed (BPM), and a toggleable metronome.
 
 ### Try it online
@@ -71,9 +72,7 @@ native app (see the PWA section below).
 
 ### Run locally
 
-Run `python3 -m http.server 8000` in the project directory, then open
-`http://localhost:8000/handpan-player.html`. Opening the HTML as a `file://` page still works, but
-uses the synthesis fallback because browsers do not allow it to fetch the recorded assets.
+Just open `handpan-player.html` in a browser.
 
 ### Features
 
@@ -103,8 +102,10 @@ cloud macOS machines (no local Mac/Xcode needed) — see [`codemagic.yaml`](code
 
 ### Known limitations
 
-The first tap initializes and decodes the recorded samples. On older or memory-constrained devices,
-that first sound may briefly use the synthesis fallback.
+When an iPhone's physical mute switch is on, the page's synthesized sound gets muted by the
+system — a platform-level limitation of WebKit for pure Web Audio API output (no real
+`<audio>`/`<video>` element has played anything). There's currently no reliable pure-frontend
+workaround. Make sure your phone isn't muted before using it.
 
 ### Project structure & dev notes
 

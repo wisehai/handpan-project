@@ -1,5 +1,5 @@
-// Browser smoke tests for the app shell, recorded instrument, persistence,
-// and service-worker update path.
+// Throwaway Playwright smoke test for the three fixes from this session:
+// dialog centering, delete-restores-default, and the SW update banner.
 // Run with: node scripts/verify.mjs   (serves the repo root on :8934 itself)
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PORT = 8934;
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json',
-  '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.m4a': 'audio/mp4' };
+  '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
 
 const server = createServer(async (req, res) => {
   const path = req.url === '/' ? '/handpan-player.html' : req.url.split('?')[0];
@@ -33,21 +33,6 @@ async function check(name, fn){
 
 await page.goto(`http://localhost:${PORT}/handpan-player.html`);
 await page.waitForSelector('#btnLibSave');
-
-await check('six recorded sprites load and decode', async () => {
-  const state = await page.evaluate(async () => {
-    ensureCtx();
-    return {
-      preloaded: await samplePreloadPromise,
-      decoded: await prepareSampleBuffers(),
-      sprites: sampleManifest?.sprites.length,
-      buffers: sampleBuffers.size,
-      ding: sampleManifest?.sprites.every(sprite => !!sprite.cues.D),
-    };
-  });
-  if (!state.preloaded || !state.decoded || state.sprites !== 6 || state.buffers !== 6 || !state.ding)
-    throw new Error(JSON.stringify(state));
-});
 
 await check('dialog centered (not top-left)', async () => {
   await page.click('#btnLibSave');

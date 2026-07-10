@@ -1,7 +1,7 @@
 // Minimal offline cache for the handpan app itself. Bump CACHE_NAME whenever
 // the cached files change so clients pick up the new version instead of
 // being stuck on a stale copy forever.
-const CACHE_NAME = 'handpan-v20';
+const CACHE_NAME = 'handpan-v18';
 const PRECACHE = [
   './index.html',
   './handpan-player.html',
@@ -9,13 +9,6 @@ const PRECACHE = [
   './icon-180.png',
   './icon-192.png',
   './icon-512.png',
-  './audio/handpan/samples.json',
-  './audio/handpan/soft-a.m4a',
-  './audio/handpan/soft-b.m4a',
-  './audio/handpan/medium-a.m4a',
-  './audio/handpan/medium-b.m4a',
-  './audio/handpan/strong-a.m4a',
-  './audio/handpan/strong-b.m4a',
   './vendor/pdfjs/pdf.min.js',
   './vendor/pdfjs/pdf.worker.min.js',
 ];

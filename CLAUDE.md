@@ -78,5 +78,7 @@ Everything is in one `<script>` block in `handpan-player.html`, organized top-to
   that unless asked otherwise.
 - No frameworks, no bundler, no external JS dependencies besides the lazily-loaded pdf.js. Keep it
   that way — the whole point is a single portable HTML file.
-- Frequencies/partial structures in `playHit` for `T` and the ding are annotated as "measured" —
-  they encode real acoustic observations, not arbitrary constants; don't simplify them away.
+- The per-note `TIMBRE` table (partial ratios, amplitudes, decay fractions) is measured from
+  recordings of the owner's actual pan (`test/r1.m4a`, `test/r2.m4a` — spectral analysis, two
+  takes cross-checked). These are real acoustic observations, not arbitrary constants; don't
+  simplify them away or collapse notes back onto a shared partial set.

@@ -437,7 +437,7 @@ function safeConfirm(msg){
  * the ding (`r` overrides the ring radius, `small` shrinks them).           */
 const NOTES = {
   'D': { name:'D3', freq:146.83, ding:true },
-  'T': { name:'T',  freq:293.66, shoulder:true },  // measured: D4 attack (MIDI 62), D3 tail
+  'T': { name:'T',  freq:293.66, shoulder:true },  // D4 attack over a D3 tail — see TIMBRE
   '1': { name:'A3',  freq:220.00, angle:160 },
   '2': { name:'Bb3', freq:233.08, angle:200 },
   '3': { name:'C4',  freq:261.63, angle:120 },
@@ -647,42 +647,75 @@ function unlockIosSilentSwitch(){
   a.play().catch(() => {});
 }
 
-/* Tone field / ding: fundamental + octave + compound fifth partials.
- * Shoulder (T): brighter, fewer lows, faster decay.
+/* Per-note timbre, measured from the user's own pan (test/r1.m4a, r2.m4a:
+ * FFT partial peaks + per-band decay tracking, two takes cross-checked).
+ * partials: [freq mult, peak amp rel. to fundamental, decay as fraction of
+ * dur, optional attack seconds (default 6 ms)].
+ * Octave-dominant fields (4, 7) are capped below the raw FFT ratios (3x, 7x)
+ * so they read as character, not as the octave note itself.
+ * D: in the recorded tail (1-2s) the 3x/4x partials (A4/D5) ring on and even
+ * outlast the fundamental — that sustained chord-hum is the ding's warmth.
+ * T: measured hierarchy is 1.5x (A4) dominant with a ~120 ms bloom, 0.5x
+ * (D3) strong and lasting, 1x (D4) secondary, plus a fast 5.3x metallic
+ * shimmer (~1554 Hz).                                                     */
+const TIMBRE = {
+  'D':  { dur:4.8, partials:[[1,1,1],[2,.55,1],[3,.33,1.6],[4,.10,1.6]] },
+  'T':  { dur:4.5, partials:[[.5,.9,.9],[1,.55,.7],[1.5,1,1,.12],[2,.15,.5],[5.3,.12,.15]] },
+  '1':  { dur:4.2, partials:[[1,1,1],[2,.22,.85],[3,.10,.5]] },
+  '2':  { dur:4.2, partials:[[1,1,1],[2,.10,.8],[3,.04,.5]] },
+  '3':  { dur:4.2, partials:[[1,1,1],[2,.60,.7],[3,.15,.4],[4,.05,.25]] },
+  '4':  { dur:4.2, partials:[[.5,.15,.9],[1,1,1],[2,1.2,.6],[3,.18,.4]] },
+  '5':  { dur:4.2, partials:[[1,1,1],[2,.27,.7],[3,.07,.4]] },
+  '6':  { dur:4.2, partials:[[1,1,1],[2,.15,.7],[3,.04,.4]] },
+  '7':  { dur:4.2, partials:[[.5,.12,.8],[1,1,1],[1.5,.12,.5],[2,1.8,.7],[3,.15,.4]] },
+  '8':  { dur:4.2, partials:[[1,1,1],[2,.11,.7],[3,.02,.4]] },
+  '9':  { dur:3.8, partials:[[1,1,1],[2,.03,.6]] },
+  '10': { dur:3.8, partials:[[.5,.12,.8],[1,1,1],[2,.02,.6]] },
+  '11': { dur:3.8, partials:[[.5,.05,.8],[1,1,1],[2,.03,.6]] },
+};
+
+/* Tone field / ding / shoulder: additive partials per TIMBRE, each with its
+ * own envelope, plus a strike-noise burst and a faint ~76 Hz body resonance
+ * (Helmholtz thump — present on every strike in the recordings).
  * Slap (S): unpitched — body thump + band-passed noise crack.           */
 function playHit(key, t, vel){
   if (key === 'S'){ playSlap(t, vel); return; }
-  const note = NOTES[key];
-  if (!note) return;
+  const note = NOTES[key], tim = TIMBRE[key];
+  if (!note || !tim) return;
 
-  let dur, partials, noiseF, noiseAmp;
-  if (note.shoulder){
-    // measured: strong D4 attack (MIDI 62) decaying into a faint D3 tail (MIDI 50)
-    dur = 1.8;
-    partials = [[1, 1.0], [1.5, 0.22], [2, 0.10], [0.5, 0.30]];
-    noiseF = note.freq * 3; noiseAmp = 0.30;
-  } else {
-    dur = note.ding ? 3.0 : 2.1;
-    partials = [[1, 1.0], [2, 0.55], [3, 0.22], [4.16, 0.05]];
-    noiseF = note.freq * 2.5; noiseAmp = 0.35;
-  }
+  const dur = tim.dur, partials = tim.partials;
+  const noiseF = note.freq * (note.shoulder ? 3 : 2.5);
+  const noiseAmp = note.shoulder ? 0.30 : 0.35;
 
+  // static hit gain, normalized so octave-heavy notes (4, 7) don't jump out
+  const ampSum = partials.reduce((s, p) => s + p[1], 0);
   const g = actx.createGain();
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(0.5 * vel, t + 0.006);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  g.gain.value = 0.5 * vel * Math.min(1, 1.9 / ampSum);
   g.connect(master);
 
-  for (const [mult, amp] of partials){
+  for (const [mult, amp, decayFrac, attack] of partials){
     const o = actx.createOscillator();
     o.type = 'sine';
     o.frequency.value = note.freq * mult;
     o.detune.value = (Math.random() * 6) - 3;
     const og = actx.createGain();
-    og.gain.value = amp;
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(amp, t + (attack || 0.006));
+    og.gain.exponentialRampToValueAtTime(0.0001, t + dur * decayFrac);
     o.connect(og); og.connect(g);
-    o.start(t); o.stop(t + dur + 0.1);
+    o.start(t); o.stop(t + dur * Math.max(1, decayFrac) + 0.1);
   }
+
+  // body resonance: soft low hum from the shell cavity (~83 Hz measured)
+  const bo = actx.createOscillator();
+  bo.type = 'sine';
+  bo.frequency.value = 83 + (Math.random() * 8) - 4;
+  const bg = actx.createGain();
+  bg.gain.setValueAtTime(0.0001, t);
+  bg.gain.exponentialRampToValueAtTime(note.ding ? 0.10 : 0.07, t + 0.008);
+  bg.gain.exponentialRampToValueAtTime(0.0001, t + 1.0);
+  bo.connect(bg); bg.connect(g);
+  bo.start(t); bo.stop(t + 1.1);
 
   // attack transient: 30 ms band-passed noise burst
   const nLen = Math.floor(actx.sampleRate * 0.03);
@@ -697,29 +730,51 @@ function playHit(key, t, vel){
   src.start(t);
 }
 
+/* Slap, matched to the recordings: the 0-80 ms spectrum has two equal ridges
+ * (120-300 Hz body knock and 1500-3000 Hz metallic clap) with a deep notch
+ * between them at 700-1500 Hz, and the strike leaves the shell's low modes
+ * (D3 / C4 / E4) ringing softly afterwards.                               */
 function playSlap(t, vel){
-  // low body thump with a fast downward pitch sweep
+  // low body knock with a fast downward pitch sweep
   const o = actx.createOscillator();
   o.type = 'sine';
   o.frequency.setValueAtTime(210, t);
-  o.frequency.exponentialRampToValueAtTime(85, t + 0.09);
+  o.frequency.exponentialRampToValueAtTime(80, t + 0.065);
   const g = actx.createGain();
   g.gain.setValueAtTime(0.55 * vel, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
   o.connect(g); g.connect(master);
   o.start(t); o.stop(t + 0.18);
 
-  // noise crack, low-passed for a fleshy palm sound
-  const nLen = Math.floor(actx.sampleRate * 0.06);
-  const buf = actx.createBuffer(1, nLen, actx.sampleRate);
-  const ch = buf.getChannelData(0);
-  for (let i = 0; i < nLen; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / nLen, 2);
-  const src = actx.createBufferSource(); src.buffer = buf;
-  const lp = actx.createBiquadFilter();
-  lp.type = 'lowpass'; lp.frequency.value = 1400; lp.Q.value = 0.8;
-  const ng = actx.createGain(); ng.gain.value = 0.6 * vel;
-  src.connect(lp); ng.connect(master); lp.connect(ng);
-  src.start(t);
+  // two noise bands: low-mid knock + bright metallic clap (notch in between)
+  const mkNoise = (secs, taperPow, freq, q, gain) => {
+    const nLen = Math.floor(actx.sampleRate * secs);
+    const buf = actx.createBuffer(1, nLen, actx.sampleRate);
+    const ch = buf.getChannelData(0);
+    for (let i = 0; i < nLen; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / nLen, taperPow);
+    const src = actx.createBufferSource(); src.buffer = buf;
+    const bp = actx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = q;
+    const ng = actx.createGain(); ng.gain.value = gain * vel;
+    src.connect(bp); bp.connect(ng); ng.connect(master);
+    src.start(t);
+  };
+  mkNoise(0.06, 2, 250, 0.9, 0.9);     // body knock
+  mkNoise(0.045, 1.5, 2200, 2.2, 1.6); // metallic clap
+
+  // shell after-ring: the strike leaves the pan's low modes sounding
+  for (const [freq, amp, dec] of [[147.8, 0.05, 0.8], [261.6, 0.03, 0.5], [329.6, 0.025, 0.5]]){
+    const ro = actx.createOscillator();
+    ro.type = 'sine';
+    ro.frequency.value = freq;
+    ro.detune.value = (Math.random() * 6) - 3;
+    const rg = actx.createGain();
+    rg.gain.setValueAtTime(0.0001, t);
+    rg.gain.exponentialRampToValueAtTime(amp * vel, t + 0.012);
+    rg.gain.exponentialRampToValueAtTime(0.0001, t + dec);
+    ro.connect(rg); rg.connect(master);
+    ro.start(t); ro.stop(t + dec + 0.1);
+  }
 }
 
 function playTick(t, strong){

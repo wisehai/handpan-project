@@ -446,9 +446,10 @@ const NOTES = {
   '6': { name:'F4',  freq:349.23, angle:280 },
   '7': { name:'G4',  freq:392.00, angle: 40 },
   '8': { name:'A4',  freq:440.00, angle:320 },
-  '9': { name:'Bb4', freq:466.16, angle:  0 },
-  '10': { name:'C5', freq:523.25, angle:327, r:95, small:true },
-  '11': { name:'D5', freq:587.33, angle: 33, r:95, small:true },
+  // 9-11 follow the owner's recordings (C5/D5/E5); an earlier table sat a whole tone low.
+  '9': { name:'C5', freq:523.25, angle:  0 },
+  '10': { name:'D5', freq:587.33, angle:327, r:95, small:true },
+  '11': { name:'E5', freq:659.25, angle: 33, r:95, small:true },
 };
 
 /* ---------- Default score ---------------------------------------------
@@ -738,10 +739,10 @@ function playSlap(t, vel){
   // low body knock with a fast downward pitch sweep
   const o = actx.createOscillator();
   o.type = 'sine';
-  o.frequency.setValueAtTime(210, t);
-  o.frequency.exponentialRampToValueAtTime(80, t + 0.065);
+  o.frequency.setValueAtTime(150, t);
+  o.frequency.exponentialRampToValueAtTime(65, t + 0.055);
   const g = actx.createGain();
-  g.gain.setValueAtTime(0.55 * vel, t);
+  g.gain.setValueAtTime(0.5 * vel, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
   o.connect(g); g.connect(master);
   o.start(t); o.stop(t + 0.18);
@@ -759,8 +760,9 @@ function playSlap(t, vel){
     src.connect(bp); bp.connect(ng); ng.connect(master);
     src.start(t);
   };
-  mkNoise(0.06, 2, 250, 0.9, 0.9);     // body knock
-  mkNoise(0.045, 1.5, 2200, 2.2, 1.6); // metallic clap
+  mkNoise(0.06, 2, 250, 1.4, 1.6);     // body knock
+  mkNoise(0.045, 1.5, 2200, 1.3, 0.75); // lower clap ridge (secondary in the recordings)
+  mkNoise(0.035, 1.2, 6800, 0.9, 1.0); // dominant 5-10 kHz crack — this is the crispness
 
   // shell after-ring: the strike leaves the pan's low modes sounding
   for (const [freq, amp, dec] of [[147.8, 0.05, 0.8], [261.6, 0.03, 0.5], [329.6, 0.025, 0.5]]){

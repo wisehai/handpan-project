@@ -75,13 +75,14 @@
   #panBox{display:flex;justify-content:center;}
   svg{max-width:520px;width:100%;height:auto;display:block;touch-action:none;}
   .pad-circle{cursor:pointer;transition:filter .12s;}
-  .pad-circle:hover{filter:brightness(1.12);}
-  .pad-label{font-size:19px;font-weight:600;fill:#333c44;pointer-events:none;}
-  .pad-num{font-size:12px;fill:#77828c;pointer-events:none;}
+  .pad-circle:hover{filter:brightness(1.25);}
+  .pad-num{font-size:12px;font-weight:600;fill:#c6ced5;pointer-events:none;}
+  .on-ding .pad-num{fill:#2b333b;}
+  .pad-dimple{pointer-events:none;}
   .hit-R .pad-fill{fill:var(--brass);}
   .hit-L .pad-fill{fill:var(--lblue);}
-  .hit-R .pad-label,.hit-R .pad-num,
-  .hit-L .pad-label,.hit-L .pad-num{fill:#20160a;}
+  .hit-R .pad-dimple,.hit-L .pad-dimple{opacity:0;}
+  .hit-R .pad-num,.hit-L .pad-num{fill:#20160a;}
   #tRing{cursor:pointer;transition:stroke .12s;}
   #tRing:hover{stroke:#5b6a77;}
   #tRing.hit-R{stroke:var(--brass);}
@@ -216,8 +217,8 @@
         <svg id="pan" viewBox="0 0 500 500" role="img" data-i18n-aria="ariaPan" aria-label="Handpan layout"></svg>
       </div>
       <div class="legend">
-        <span><span class="dot" style="background:var(--brass)"></span><span data-i18n="legendR">Right hand R</span></span>
         <span><span class="dot" style="background:var(--lblue)"></span><span data-i18n="legendL">Left hand L</span></span>
+        <span><span class="dot" style="background:var(--brass)"></span><span data-i18n="legendR">Right hand R</span></span>
         <span data-i18n="legendT">T = shoulder (ring around Ding)</span>
         <span data-i18n="legendS">S = slap (shell)</span>
       </div>
@@ -278,7 +279,7 @@
 <script>
 'use strict';
 /* =====================================================================
- * Handpan player — D Kurd 8+1
+ * Handpan player — D Kurd 12 (11+1)
  * Two-row (R/L hand) score, T shoulder tone, S slap,
  * Web Audio synthesis + SVG visualization
  * ===================================================================== */
@@ -291,9 +292,9 @@ const I18N = {
   en: {
     title:      'Wise<em>Pan</em>',
     subtitle:   'Your handpan practice partner',
-    panTitle:   'D Kurd Handpan · tap to preview',
-    legendR:    'Right hand R',
+    panTitle:   'D Kurd 12 Handpan · tap to preview',
     legendL:    'Left hand L',
+    legendR:    'Right hand R',
     legendT:    'T = shoulder (ring around Ding)',
     legendS:    'S = slap (shell)',
     play:       '▶ Play',
@@ -317,7 +318,7 @@ const I18N = {
     sure:       'Sure?',
     builtinGroup: 'Built-in',
     userGroup:  'My scores',
-    hint: 'Tokens: <code>D</code> Ding, <code>1</code>–<code>8</code> tone fields, <code>T</code> shoulder, ' +
+    hint: 'Tokens: <code>D</code> Ding, <code>1</code>–<code>11</code> tone fields, <code>T</code> shoulder, ' +
           '<code>S</code> slap, <code>.</code> rest, <code>|</code> barline (display only), <code>#</code> comment line. ' +
           'Click any column below to play from there.',
     playFromHere: 'Play from here',
@@ -347,9 +348,9 @@ const I18N = {
   zh: {
     title:      '悟<em>碟</em>',
     subtitle:   '你的手碟练习搭子',
-    panTitle:   'D库尔德 手碟 · 点击可试听',
-    legendR:    '右手 R',
+    panTitle:   'D库尔德12音 手碟 · 点击可试听',
     legendL:    '左手 L',
+    legendR:    '右手 R',
     legendT:    'T = 肩音（Ding 外圈）',
     legendS:    'S = Slap（碟面）',
     play:       '▶ 播放',
@@ -373,7 +374,7 @@ const I18N = {
     sure:       '确认?',
     builtinGroup: '内置',
     userGroup:  '我的曲子',
-    hint: '记号：<code>D</code> Ding，<code>1</code>–<code>8</code> 音区，' +
+    hint: '记号：<code>D</code> Ding，<code>1</code>–<code>11</code> 音区，' +
           '<code>T</code> 肩音，<code>S</code> Slap，<code>.</code> 休止，' +
           '<code>|</code> 小节线（仅显示），<code>#</code> 注释行。' +
           '点击下方任意列可从该处播放。',
@@ -431,17 +432,23 @@ function safeConfirm(msg){
 }
 
 /* ---------- Note table (name, frequency, ring angle from top, CW) ---- */
+/* Layout: odd fields on the right, even on the left, ascending bottom->top;
+ * 9 at the top of the outer ring; 10 and 11 are two small inner pads above
+ * the ding (`r` overrides the ring radius, `small` shrinks them).           */
 const NOTES = {
   'D': { name:'D3', freq:146.83, ding:true },
   'T': { name:'T',  freq:293.66, shoulder:true },  // measured: D4 attack (MIDI 62), D3 tail
-  '1': { name:'A3',  freq:220.00, angle:180 },
-  '2': { name:'Bb3', freq:233.08, angle:225 },
-  '3': { name:'C4',  freq:261.63, angle:135 },
-  '4': { name:'D4',  freq:293.66, angle:270 },
-  '5': { name:'E4',  freq:329.63, angle: 90 },
-  '6': { name:'F4',  freq:349.23, angle:315 },
-  '7': { name:'G4',  freq:392.00, angle: 45 },
-  '8': { name:'A4',  freq:440.00, angle:  0 },
+  '1': { name:'A3',  freq:220.00, angle:160 },
+  '2': { name:'Bb3', freq:233.08, angle:200 },
+  '3': { name:'C4',  freq:261.63, angle:120 },
+  '4': { name:'D4',  freq:293.66, angle:240 },
+  '5': { name:'E4',  freq:329.63, angle: 80 },
+  '6': { name:'F4',  freq:349.23, angle:280 },
+  '7': { name:'G4',  freq:392.00, angle: 40 },
+  '8': { name:'A4',  freq:440.00, angle:320 },
+  '9': { name:'Bb4', freq:466.16, angle:  0 },
+  '10': { name:'C5', freq:523.25, angle:327, r:95, small:true },
+  '11': { name:'D5', freq:587.33, angle: 33, r:95, small:true },
 };
 
 /* ---------- Default score ---------------------------------------------
@@ -449,67 +456,40 @@ const NOTES = {
  * (upper row = R, lower row = L), recovered from the user's `X+Y` token
  * order (first = upper). Rows for isolated single notes are inferred
  * from pattern continuity and may need review.                          */
-const DEFAULT_SCORE = `# Pocket Groove 11 (D Kurd 8+1)  BPM=110
-# Variation 1
-R: D . 1 . D . 1 . | D . 1 . D . 1 .
-L: 4 . . 4 . . 4 . | . 4 . . 4 . . .
+const DEFAULT_SCORE = `# Pocket Groove 11 (D Kurd 12)  BPM=110
 
-R: D . 1 . D . 1 . | D . 1 . D . 1 .
-L: 4 . . 4 . . 4 . | . 4 . . 4 . . .
+R: D . 1 . D . 1 . | D . 1 . D . 1 . | D . 1 . D . 1 . | D . 1 . D . 1 .
+L: 4 . . 4 . . 4 . | . 4 . . 4 . . . | 4 . . 4 . . 4 . | . 4 . . 4 . . .
 
-R: D . 2 . D . 2 . | D . 2 . D . 2 .
-L: 5 . . 5 . . 5 . | . 5 . . 5 . . .
+R: D . 2 . D . 2 . | D . 2 . D . 2 . | D . 2 . D . 2 . | D . 2 . D . 2 .
+L: 5 . . 5 . . 5 . | . 5 . . 5 . . . | 5 . . 5 . . 5 . | . 5 . . 5 . . .
 
-R: D . 2 . D . 2 . | D . 2 . D . 2 .
-L: 5 . . 5 . . 5 . | . 5 . . 5 . . .
+R: D . 1 . D . 1 . | D . 1 . D . 1 . | D . 1 . D . 1 . | D . 1 . D . 1 .
+L: 6 . . 6 . . 6 . | . 6 . . 6 . . . | 6 . . 6 . . 6 . | . 6 . . 6 . . .
 
-R: D . 1 . D . 1 . | D . 1 . D . 1 .
-L: 6 . . 6 . . 6 . | . 6 . . 6 . . .
+R: D . 2 . D . 2 . | D . 2 . D . 2 . | D . 2 . D . 2 . | D . 2 . T . D .
+L: 7 . . 7 . . 7 . | . 7 . . 7 . . . | 7 . . 7 . . 7 . | . 7 . D . . . .
 
-R: D . 1 . D . 1 . | D . 1 . D . 1 .
-L: 6 . . 6 . . 6 . | . 6 . . 6 . . .
 
-# Variation 2
-R: D . 2 . D . 2 . | D . 2 . D . 2 .
-L: 7 . . 7 . . 7 . | . 7 . . 7 . . .
+R: D . 1 . D . 1 . | D . 1 . D . 1 . | D . 1 . D . 1 . | D . 1 . D . 1 .
+L: 8 . . 7 . . 6 . | 8 . . 7 . . 6 . | 8 . . 7 . . 6 . | 8 . . 7 . . 6 .
 
-R: D . 2 . D . 2 . | D . 2 . D . 2 .
-L: 7 . . 7 . . 7 . | . 7 . . 7 . . .
+R: D . 2 . D . 2 . | D . 2 . D . 2 . | D . 2 . D . 2 . | D . 2 . D . 2 .
+L: 8 . . 7 . . 6 . | 8 . . 7 . . 6 . | 8 . . 7 . . 6 . | 8 . . 7 . . 6 .
 
-# Variation 3
-R: D . 1 7 D . 1 . | D . 1 7 D . 6 .
-L: 8 . . . . . 6 . | 8 . . . . . 1 .
+R: D . 1 . D . 1 . | D . 1 . D . 1 . | D . 1 . D . 1 . | D . 1 . D . 1 .
+L: 8 . . 7 . . 6 . | 8 . . 7 . . 6 . | 8 . . 7 . . 6 . | 8 . . 7 . . 7 .
 
-R: D . 1 7 D . 1 . | D . 1 7 D . 6 .
-L: 8 . . . . . 6 . | 8 . . . . . 1 .
+R: D . 2 . D . 2 . | D . 2 . D . 2 . | D . 1 . D . 1 . | D . 1 . T . D .
+L: 6 . . 6 . . 6 . | . 6 . . 6 . . . | 4 . . 4 . . 4 . | . 4 . D . . . .
 
-R: D . 2 7 D . 2 . | D . 2 7 D . 6 .
-L: 8 . . . . . 6 . | 8 . . . . . 2 .
-
-R: D . 2 7 D . 2 . | D . 2 7 D . 6 .
-L: 8 . . . . . 6 . | 8 . . . . . 2 .
-
-R: D . 1 7 D . 1 . | D . 1 7 D . 6 .
-L: 8 . . . . . 6 . | 8 . . . . . 1 .
-
-R: D . 1 7 D . 1 . | D . 1 7 D . 7 .
-L: 8 . . . . . 6 . | 8 . . . . . 1 .
-
-# Variation 4
-R: D . 2 . D . 2 . | D . 2 . D . 2 .
-L: 6 . . 6 . . 6 . | . 6 . . 6 . . .
-
-R: D . 1 . D . 1 . | D . 1 . T . D .
-L: 4 . . 4 . . 4 . | . 4 . D . . . .
-
-# Ending
 R: D
 L: 4`;
 
 /* =========================== Build the SVG pan ======================= */
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const pan = document.getElementById('pan');
-const CX = 250, CY = 250, RING_R = 168, PAD_R = 40, DING_R = 50, T_R = 68;
+const CX = 250, CY = 250, DING_CY = 280, RING_R = 168, T_R = 68;
 const padEls = {};   // key -> {g, cx, cy, r, ring?}
 
 function el(tag, attrs, parent){
@@ -521,60 +501,97 @@ function el(tag, attrs, parent){
 
 function buildPan(){
   const defs = el('defs', {}, pan);
-  const grad = el('radialGradient', {id:'shellg', cx:'38%', cy:'32%', r:'85%'}, defs);
-  el('stop', {offset:'0%',  'stop-color':'#414e59'}, grad);
-  el('stop', {offset:'55%', 'stop-color':'#2c3742'}, grad);
-  el('stop', {offset:'100%','stop-color':'#1b232b'}, grad);
-  const padGrad = el('radialGradient', {id:'padg', cx:'40%', cy:'35%', r:'80%'}, defs);
-  el('stop', {offset:'0%',  'stop-color':'#f4f2ec'}, padGrad);
-  el('stop', {offset:'100%','stop-color':'#d5d3ca'}, padGrad);
+  const grad = el('radialGradient', {id:'shellg', cx:'38%', cy:'30%', r:'85%'}, defs);
+  el('stop', {offset:'0%',  'stop-color':'#4a5763'}, grad);
+  el('stop', {offset:'55%', 'stop-color':'#313d48'}, grad);
+  el('stop', {offset:'100%','stop-color':'#1b232c'}, grad);
+  // tone-field oval: brushed steel, highlight upper-left (lit like the shell)
+  const padGrad = el('radialGradient', {id:'padg', cx:'42%', cy:'32%', r:'85%'}, defs);
+  el('stop', {offset:'0%',  'stop-color':'#57636f'}, padGrad);
+  el('stop', {offset:'60%', 'stop-color':'#414c57'}, padGrad);
+  el('stop', {offset:'100%','stop-color':'#38424c'}, padGrad);
+  // center dimple: light catches its lower-right inner wall -> reads concave
+  const dimGrad = el('radialGradient', {id:'dimpleg', cx:'50%', cy:'50%',
+    fx:'62%', fy:'68%', r:'75%'}, defs);
+  el('stop', {offset:'0%',  'stop-color':'#6d7987'}, dimGrad);
+  el('stop', {offset:'100%','stop-color':'#2c353f'}, dimGrad);
+  // ding dome: brightest element on the pan, highlight upper-left -> convex
+  const dingGrad = el('radialGradient', {id:'dingg', cx:'40%', cy:'32%', r:'80%'}, defs);
+  el('stop', {offset:'0%',  'stop-color':'#dde3e8'}, dingGrad);
+  el('stop', {offset:'55%', 'stop-color':'#aeb9c2'}, dingGrad);
+  el('stop', {offset:'100%','stop-color':'#7e8a94'}, dingGrad);
+  // shallow bowl depression around the ding, fading into the shell
+  const bowlGrad = el('radialGradient', {id:'bowlg', cx:'50%', cy:'44%', r:'50%'}, defs);
+  el('stop', {offset:'0%',  'stop-color':'#28323c'}, bowlGrad);
+  el('stop', {offset:'72%', 'stop-color':'#2b3540', 'stop-opacity':.85}, bowlGrad);
+  el('stop', {offset:'100%','stop-color':'#2b3540', 'stop-opacity':0}, bowlGrad);
 
   // shell — clicking empty shell area previews a slap
   const shell = el('circle', {id:'shell', cx:CX, cy:CY, r:228, fill:'url(#shellg)',
-    stroke:'#465360', 'stroke-width':2, tabindex:0, role:'button',
+    stroke:'#3a4652', 'stroke-width':2, tabindex:0, role:'button',
     'aria-label':tr('ariaSlap')}, pan);
+  // knurled rim tape
+  el('circle', {cx:CX, cy:CY, r:234, fill:'none', stroke:'#8b96a0',
+    'stroke-width':7, 'stroke-dasharray':'1.5 2.5', opacity:.55,
+    'pointer-events':'none'}, pan);
   el('circle', {cx:CX, cy:CY, r:214, fill:'none', stroke:'#161d24',
-    'stroke-width':1.5, opacity:.7, 'pointer-events':'none'}, pan);
+    'stroke-width':1.5, opacity:.5, 'pointer-events':'none'}, pan);
   const slapTrig = e => { e.preventDefault(); ensureCtx(); playEventNow([{key:'S', hand:null}]); };
   shell.addEventListener('pointerdown', slapTrig);
   shell.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();slapTrig(e);} });
 
-  // T shoulder ring around the ding
-  const tRing = el('circle', {id:'tRing', cx:CX, cy:CY, r:T_R, fill:'none',
-    stroke:'#4a5763', 'stroke-width':13, 'pointer-events':'stroke',
+  // bowl depression under the ding + T ring (drawn before the pads)
+  el('ellipse', {cx:CX, cy:DING_CY, rx:118, ry:96, fill:'url(#bowlg)',
+    'pointer-events':'none'}, pan);
+
+  // T shoulder ring around the ding (elliptical, following the flat ding)
+  const tRing = el('ellipse', {id:'tRing', cx:CX, cy:DING_CY, rx:78, ry:62,
+    fill:'none', stroke:'#39434f', 'stroke-width':16, 'pointer-events':'stroke',
     tabindex:0, role:'button', 'aria-label':tr('ariaT')}, pan);
-  el('text', {x:CX + (T_R+16)*Math.SQRT1_2, y:CY - (T_R+13)*Math.SQRT1_2,
+  // label sits lower-right so it clears the inner pads 10/11 above the ding
+  el('text', {x:CX + 66, y:DING_CY + 56,
     class:'pad-num', 'text-anchor':'middle', 'pointer-events':'none'}, pan)
     .textContent = 'T';
   const tTrig = e => { e.preventDefault(); ensureCtx(); playEventNow([{key:'T', hand:null}]); };
   tRing.addEventListener('pointerdown', tTrig);
   tRing.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();tTrig(e);} });
-  padEls['T'] = {g:tRing, cx:CX, cy:CY, r:T_R, ring:true};
+  padEls['T'] = {g:tRing, cx:CX, cy:DING_CY, r:T_R, ring:true};
   padEls['S'] = {g:shell, cx:CX, cy:CY, r:228, shell:true};
 
-  const makePad = (key, cx, cy, r) => {
-    const g = el('g', {class:'pad-circle', tabindex:0, role:'button',
-                       'aria-label':tr('ariaPad', key)}, pan);
-    el('circle', {class:'pad-fill', cx, cy, r, fill:'url(#padg)',
-                  stroke:'#10151a', 'stroke-width':2}, g);
+  // one tone field: tangential ellipse (major axis ⟂ radius) + inner dimple
+  const makePad = (key, cx, cy, rx, ry, rot) => {
     const n = NOTES[key];
-    el('text', {class:'pad-label', x:cx, y:cy + (n.ding ? 0 : -2),
+    const g = el('g', {class:'pad-circle' + (n.ding ? ' on-ding' : ''),
+                       tabindex:0, role:'button', 'aria-label':tr('ariaPad', key)}, pan);
+    const spin = rot ? 'rotate(' + rot + ' ' + cx + ' ' + cy + ')' : null;
+    const shape = {class:'pad-fill', cx, cy, rx, ry,
+                   fill: n.ding ? 'url(#dingg)' : 'url(#padg)',
+                   stroke:'#141a20', 'stroke-width':2};
+    if (spin) shape.transform = spin;
+    el('ellipse', shape, g);
+    if (!n.ding){
+      const dim = {class:'pad-dimple', cx, cy,
+                   rx: Math.round(rx*0.42), ry: Math.round(ry*0.38),
+                   fill:'url(#dimpleg)'};
+      if (spin) dim.transform = spin;
+      el('ellipse', dim, g);
+    }
+    el('text', {class:'pad-num', x:cx, y:cy,
                 'text-anchor':'middle', 'dominant-baseline':'middle'}, g)
-      .textContent = n.name;
-    el('text', {class:'pad-num', x:cx, y:cy + 18, 'text-anchor':'middle'}, g)
       .textContent = n.ding ? 'Ding' : key;
     const trigger = e => { e.preventDefault(); ensureCtx(); playEventNow([{key, hand:null}]); };
     g.addEventListener('pointerdown', trigger);
     g.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();trigger(e);} });
-    padEls[key] = {g, cx, cy, r};
+    padEls[key] = {g, cx, cy, r: Math.max(rx, ry)};
   };
 
   for (const key in NOTES){
     const n = NOTES[key];
     if (n.shoulder) continue;
-    if (n.ding){ makePad(key, CX, CY, DING_R); continue; }
-    const a = n.angle * Math.PI / 180;
-    makePad(key, CX + RING_R * Math.sin(a), CY - RING_R * Math.cos(a), PAD_R);
+    if (n.ding){ makePad(key, CX, DING_CY, 56, 40, 0); continue; }
+    const a = n.angle * Math.PI / 180, R = n.r || RING_R;
+    makePad(key, CX + R * Math.sin(a), CY - R * Math.cos(a),
+            n.small ? 34 : 44, n.small ? 25 : 33, n.angle);
   }
 }
 buildPan();
@@ -727,7 +744,7 @@ let events = [], blocks = [], parseWarnings = [];
 function tokenize(s){
   // Normalize glued tokens: ".|" -> ". |", "T." -> "T .", "1+4." -> "1+4 ."
   return s.replace(/\|/g, ' | ')
-          .replace(/([DTSdts1-8+])\.(?!\S)/g, '$1 .')
+          .replace(/([DTSdts0-9+])\.(?!\S)/g, '$1 .')
           .trim().split(/\s+/).filter(Boolean);
 }
 
@@ -980,7 +997,10 @@ document.getElementById('btnApply').addEventListener('click', () => applyScore()
  * Fails only on scanned/rasterized PDFs, which have no text layer.      */
 const PDFJS_URL    = './vendor/pdfjs/pdf.min.js';
 const PDFJS_WORKER = './vendor/pdfjs/pdf.worker.min.js';
-const TOKEN_RE = /^(D|T|S|[1-8])$/i;   // case-insensitive: some glyph variants render lowercase
+const TOKEN_RE = /^(D|T|S|1[01]|[1-9])$/i;   // case-insensitive: some glyph variants render lowercase
+// `10`/`11` match only when the PDF stores them as one text item; if split
+// into two glyphs they arrive as `1` + a stray `0`/`1` and can't be told
+// apart from real notes, so we accept that edge case going unrecognized.
 const MIN_ROW_TOKENS = 3;   // rows with fewer tokens are treated as junk
 const ROW_Y_TOL = 4;        // y tolerance when clustering tokens into a row
 const SYSTEM_GAP = 45;      // max y gap between the R and L rows of one system

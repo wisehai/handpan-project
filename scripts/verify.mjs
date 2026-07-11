@@ -147,8 +147,83 @@ await check('follow mode: fake mic starts, UI collapses, exit restores', async (
     if (!v) throw new Error(`after entering follow mode, ${k} is false`);
   await page.click('#btnFollowExit');
   await page.waitForFunction(() => !document.body.classList.contains('follow'));
+  await page.waitForTimeout(50);   // let the rAF-scheduled row-band recompute settle
   const after = await page.evaluate(() => ({ micGone: !micStream && !micAnalyser }));
   if (!after.micGone) throw new Error('mic stream still open after exiting follow mode');
+});
+
+await check('row bands: zebra stripes + current-row highlight', async () => {
+  await page.click('#btnFollow');
+  await page.waitForSelector('body.follow', { timeout: 5000 });
+  try {
+    const state = await page.evaluate(() => {
+      const bands = [...document.querySelectorAll('#trackBands .rowband')];
+      const cur = document.querySelector('#trackView .col.now');
+      return {
+        count: bands.length,
+        hasOdd: bands.some(b => b.classList.contains('rowband-odd')),
+        hasEven: bands.some(b => !b.classList.contains('rowband-odd')),
+        curRow: cur && cur.dataset.row,
+        nowRowMatchesCur: cur && !!document.querySelector(
+          '#trackBands .rowband[data-row="' + cur.dataset.row + '"].now-row'),
+      };
+    });
+    if (state.count < 4) throw new Error(`expected several row bands, found ${state.count}`);
+    if (!state.hasOdd || !state.hasEven) throw new Error('row bands are not alternating');
+    if (state.curRow === undefined || state.curRow === null) throw new Error('current .col.now has no data-row');
+    if (!state.nowRowMatchesCur) throw new Error('current row band is missing .now-row');
+  } finally {
+    if (await page.locator('body.follow').count()){
+      await page.click('#btnFollowExit');
+      await page.waitForFunction(() => !document.body.classList.contains('follow'));
+    }
+  }
+});
+
+await check('follow mode: tapping a column jumps the cursor, never plays audio', async () => {
+  await page.click('#btnFollow');
+  await page.waitForSelector('body.follow', { timeout: 5000 });
+  const target = await page.evaluate(() => {
+    // pick a playable (non-rest) column a bit further in than the cursor
+    const cols = [...document.querySelectorAll('#trackView .col')];
+    const cur = document.querySelector('#trackView .col.now');
+    const curIdx = cur ? cols.indexOf(cur) : 0;
+    let col = null;
+    for (let i = Math.min(cols.length - 1, curIdx + 20); i < cols.length; i++)
+      if (events[Number(cols[i].dataset.event)].hits.length){ col = cols[i]; break; }
+    col.click();
+    return Number(col.dataset.event);
+  });
+  const after = await page.evaluate(() => ({
+    playing, followPos,
+    curEvt: Number((document.querySelector('#trackView .col.now') || {}).dataset?.event),
+  }));
+  if (after.playing) throw new Error('clicking a column during follow mode started playback');
+  if (after.curEvt !== target) throw new Error(`expected cursor at ${target}, got ${after.curEvt}`);
+  await page.click('#btnFollowExit');
+  await page.waitForFunction(() => !document.body.classList.contains('follow'));
+});
+
+await check('follow mode centers the active row; normal mode edge-clamps', async () => {
+  await page.evaluate(() => { followPos = 0; });
+  await page.click('#btnFollow');
+  await page.waitForSelector('body.follow', { timeout: 5000 });
+  await page.evaluate(() => {
+    for (let i = 0; i < 30; i++){
+      const idx = followTargetIdx();
+      if (idx < 0) break;
+      followAdvance(idx);
+    }
+  });
+  await page.waitForTimeout(500);   // let the smooth scroll settle
+  const centered = await page.evaluate(() => {
+    const s = document.querySelector('#trackView .col.now');
+    const r = s.getBoundingClientRect(), box = document.getElementById('trackView').getBoundingClientRect();
+    return Math.abs((r.top + r.height / 2) - (box.top + box.height / 2));
+  });
+  if (centered > 40) throw new Error(`active row not centered in follow mode: ${centered}px off-center`);
+  await page.click('#btnFollowExit');
+  await page.waitForFunction(() => !document.body.classList.contains('follow'));
 });
 
 await check('transport controls share one row on narrow phones', async () => {

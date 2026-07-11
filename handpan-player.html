@@ -129,9 +129,14 @@
   .hint code{background:var(--panel-2);border:1px solid var(--line);border-radius:4px;
     padding:0 5px;color:var(--brass);font-family:Consolas,Menlo,monospace;}
 
-  #trackView{margin-top:14px;background:#12171c;border:1px solid var(--line);border-radius:10px;
-    padding:10px 12px;max-height:230px;overflow-y:auto;
+  #trackView{position:relative;margin-top:14px;background:#12171c;border:1px solid var(--line);
+    border-radius:10px;padding:10px 12px;max-height:230px;overflow-y:auto;
     font-family:"SF Mono",Consolas,Menlo,monospace;font-size:12.5px;}
+  /* zero-height positioning root for the absolutely-placed row bands below it */
+  #trackBands{position:relative;height:0;}
+  .rowband{position:absolute;left:0;right:0;pointer-events:none;border-radius:4px;}
+  .rowband-odd{background:rgba(255,255,255,.025);}
+  .rowband.now-row{background:rgba(216,164,92,.14);}   /* --brass at low alpha */
   .vlabel{display:block;color:var(--muted);font-size:11px;letter-spacing:.14em;
     margin:8px 0 3px;}
   .block{line-height:1;}
@@ -989,23 +994,104 @@ function renderTrack(){
       };
       col.appendChild(mk(b.single ? (c.rT || c.lT) : c.rT));
       if (!b.single) col.appendChild(mk(c.lT));
-      col.addEventListener('click', () => startFrom(c.evIdx));
+      // In follow mode a stray tap must never trigger audible playback (the
+      // mic would then hear the app's own output); just retarget the cursor.
+      col.addEventListener('click', () => followOn ? followJumpTo(c.evIdx) : startFrom(c.evIdx));
       div.appendChild(col);
     }
     trackView.appendChild(div);
   }
+  computeRowBands();
 }
+
+/* ------------------- Row bands (zebra stripes + current-row) ----------
+ * The score wraps into visual lines purely via inline-flex flow, so which
+ * .col elements share a physical line isn't known until layout runs. Batch
+ * all position reads first, then all DOM writes, to avoid layout thrashing.
+ * Coordinates are measured relative to #trackBands's own rect (not
+ * trackView's), which cancels out both trackView's border/padding AND its
+ * current scrollTop — #trackBands is scrolled together with the columns it
+ * measures, so the two rects move in lockstep regardless of scroll position.
+ * data-row is assigned globally (not reset per block) so alternating colors
+ * never repeat at a block/label boundary.                                 */
+let rowBandsRaf = 0;
+function computeRowBands(){
+  let bands = document.getElementById('trackBands');
+  if (!bands){
+    bands = document.createElement('div');
+    bands.id = 'trackBands';
+    trackView.insertBefore(bands, trackView.firstChild);
+  } else if (trackView.firstChild !== bands){
+    trackView.insertBefore(bands, trackView.firstChild);
+  }
+  const bandsRect = bands.getBoundingClientRect();
+  const reads = [];   // {cols:[el...], tops:[...]} per block
+  for (const blockEl of trackView.querySelectorAll('.block')){
+    const cols = [...blockEl.querySelectorAll('.col')];
+    const tops = cols.map(el => el.getBoundingClientRect().top - bandsRect.top);
+    reads.push({cols, tops});
+  }
+  const rows = [];     // {top, bottom}
+  let rowIdx = -1, lastTop = null;
+  for (const {cols, tops} of reads){
+    for (let i = 0; i < cols.length; i++){
+      const top = tops[i], h = cols[i].offsetHeight;
+      if (lastTop === null || Math.abs(top - lastTop) > h / 2){
+        rowIdx++; lastTop = top;
+        rows.push({top, bottom: top + h});
+      } else {
+        rows[rowIdx].bottom = Math.max(rows[rowIdx].bottom, top + h);
+      }
+      cols[i].dataset.row = String(rowIdx);
+    }
+  }
+  bands.innerHTML = '';
+  rows.forEach((row, i) => {
+    const d = document.createElement('div');
+    d.className = 'rowband' + (i % 2 ? ' rowband-odd' : '');
+    d.dataset.row = String(i);
+    d.style.top = row.top + 'px';
+    d.style.height = (row.bottom - row.top) + 'px';
+    bands.appendChild(d);
+  });
+}
+function scheduleRowBands(){
+  cancelAnimationFrame(rowBandsRaf);
+  rowBandsRaf = requestAnimationFrame(() => {
+    computeRowBands();          // rebuilds #trackBands, losing any .now-row
+    const cur = trackView.querySelector('.col.now');
+    if (cur && cur.dataset.row !== undefined){
+      const band = document.querySelector('#trackBands .rowband[data-row="' + cur.dataset.row + '"]');
+      if (band) band.classList.add('now-row');
+    }
+  });
+}
+window.addEventListener('resize', scheduleRowBands);
+window.addEventListener('orientationchange', scheduleRowBands);
+document.addEventListener('fullscreenchange', scheduleRowBands);
 
 function highlightToken(evIdx){
   trackView.querySelectorAll('.col.now').forEach(n => n.classList.remove('now'));
+  const bands = document.getElementById('trackBands');
+  if (bands) bands.querySelectorAll('.rowband.now-row').forEach(n => n.classList.remove('now-row'));
   const s = trackView.querySelector('.col[data-event="' + evIdx + '"]');
   if (s){
     s.classList.add('now');
+    if (bands && s.dataset.row !== undefined){
+      const band = bands.querySelector('.rowband[data-row="' + s.dataset.row + '"]');
+      if (band) band.classList.add('now-row');
+    }
     // Scroll only trackView's own box, never scrollIntoView — that walks every
     // scrollable ancestor including the page, which fights a user's manual
     // scroll on mobile (page keeps snapping back to the score on every tick).
     const r = s.getBoundingClientRect(), box = trackView.getBoundingClientRect();
-    if (r.top < box.top) trackView.scrollBy({top: r.top - box.top, behavior: 'smooth'});
+    if (document.body.classList.contains('follow')){
+      // Follow mode: keep the active line vertically centered for lookahead.
+      // Delta is ~0 while the cursor stays within the same physical row, so
+      // this only produces a visible scroll when the row actually changes.
+      const delta = (r.top + r.height / 2) - (box.top + box.height / 2);
+      trackView.scrollBy({top: delta, behavior: 'smooth'});
+    } else if (r.top < box.top) trackView.scrollBy({top: r.top - box.top, behavior: 'smooth'});
     else if (r.bottom > box.bottom) trackView.scrollBy({top: r.bottom - box.bottom, behavior: 'smooth'});
   }
 }
@@ -1546,6 +1632,7 @@ function setImmersive(v){
   document.body.classList.toggle('immersive', immersive);
   btnImmersive.textContent = immersive ? tr('exitImmersive') : tr('immersive');
   const s = store(); if (s) s.setItem('handpan_immersive', immersive ? '1' : '0');
+  scheduleRowBands();   // the score card's width changes with the pan hidden/shown
 }
 btnImmersive.addEventListener('click', () => setImmersive(!immersive));
 
@@ -1684,6 +1771,14 @@ function followAdvance(idx){
   if (next >= 0) highlightToken(next);
 }
 
+// A tap on the score while following retargets the cursor there silently —
+// it must never play audio, or the mic would hear the app's own output.
+function followJumpTo(evIdx){
+  followPos = evIdx;
+  const idx = followTargetIdx();
+  if (idx >= 0) highlightToken(idx);
+}
+
 function handleFollowOnset(){
   if (!followOn) return;
   micAnalyser.getFloatFrequencyData(postSpec);
@@ -1820,9 +1915,12 @@ async function startFollow(){
   document.body.classList.add('follow');
   followBar.hidden = false;
   followState.textContent = tr('followListening');
+  computeRowBands();   // follow mode's larger font reflows the score into new rows
   const first = followTargetIdx();
   if (first >= 0) highlightToken(first);
-  // Best-effort niceties; each is unsupported somewhere (iOS: both).
+  // Best-effort niceties; each is unsupported somewhere (iOS: both). Fullscreen
+  // can itself change the viewport (e.g. hiding browser chrome), so re-band
+  // afterward too — fullscreenchange listener below also catches this.
   try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch (e){}
   try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch (e){}
   acquireWakeLock();
@@ -1846,6 +1944,7 @@ function stopFollow(){
   trackView.querySelectorAll('.col.now').forEach(n => n.classList.remove('now'));
   setStatus('stopped');
   updateStandaloneMetro();
+  scheduleRowBands();   // the embedded view's smaller font reflows the score
 }
 
 btnFollow.addEventListener('click', startFollow);

@@ -217,13 +217,25 @@
   body.follow #trackView .cell{min-width:1.8em;}
   body.follow #trackView .barcol{height:3.1em;margin:0 .45em;}
   body.follow #trackView .vlabel{font-size:.5em;}
-  #followBar{position:fixed;z-index:31;left:0;right:0;top:0;
+  /* display gated on body.follow: a bare `display:flex` here would override
+   * the UA's [hidden]{display:none} and pin the bar over the normal page   */
+  #followBar{display:none;}
+  body.follow #followBar{position:fixed;z-index:31;left:0;right:0;top:0;
     display:flex;gap:14px;align-items:center;
     padding:calc(7px + env(safe-area-inset-top, 0px))
             calc(16px + env(safe-area-inset-right, 0px))
             7px calc(16px + env(safe-area-inset-left, 0px));
     background:var(--panel);border-bottom:1px solid var(--line);}
   #followBar button{padding:5px 12px;border-radius:999px;font-size:12px;}
+  .icon-toggle{position:relative;}
+  .icon-toggle input{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;}
+  .icon-toggle span{display:inline-block;border:1px solid var(--line);background:var(--panel-2);
+    border-radius:9px;padding:7px 14px;font-size:18px;line-height:1.15;cursor:pointer;
+    min-width:46px;text-align:center;}
+  .icon-toggle span:hover{border-color:var(--brass-dp);}
+  .icon-toggle input:checked + span{background:var(--brass);border-color:var(--brass);
+    color:#20160a;font-weight:600;}
+  .icon-toggle input:focus-visible + span{outline:2px solid var(--brass);outline-offset:2px;}
   #followState{margin-left:auto;font-size:13px;color:var(--muted);
     font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;}
   @keyframes missFlash{0%{background:#a04848;}100%{background:transparent;}}
@@ -263,9 +275,13 @@
 
       <div class="transport">
         <button class="primary" id="btnPlay" data-i18n="play">▶ Play</button>
-        <label class="chk"><input type="checkbox" id="chkLoop"><span data-i18n="loop">Loop</span></label>
-        <label class="chk"><input type="checkbox" id="chkMetro"><span data-i18n="metro">Metronome</span></label>
         <button id="btnFollow" data-i18n="follow">🎤 Follow</button>
+        <!-- monochrome text glyphs, not emoji: they inherit `color`, so the
+             checked (brass) state stays unambiguous on every platform -->
+        <label class="chk icon-toggle" data-i18n-title="loop" title="Loop">
+          <input type="checkbox" id="chkLoop" data-i18n-aria="loop"><span>⟳</span></label>
+        <label class="chk icon-toggle" data-i18n-title="metro" title="Metronome">
+          <input type="checkbox" id="chkMetro" data-i18n-aria="metro"><span>♩</span></label>
       </div>
 
       <div class="sliders">

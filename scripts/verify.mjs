@@ -119,6 +119,9 @@ await check('follow-mode classifier recognizes synthesized notes', async () => {
 });
 
 await check('follow mode: fake mic starts, UI collapses, exit restores', async () => {
+  const barBefore = await page.evaluate(
+    () => getComputedStyle(document.getElementById('followBar')).display);
+  if (barBefore !== 'none') throw new Error(`follow bar visible outside follow mode (display: ${barBefore})`);
   await page.click('#btnFollow');
   await page.waitForSelector('body.follow', { timeout: 5000 });
   const state = await page.evaluate(() => ({

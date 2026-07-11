@@ -68,12 +68,16 @@ Everything is in one `<script>` block in `handpan-player.html`, organized top-to
    will report zero systems found.
 
 7. **Follow mode (跟弹)** — mic-driven score following: `startFollow` opens `getUserMedia` (raw,
-   no AGC/echo-cancel) into an `AnalyserNode`; `followLoop` detects strike onsets by spectral
-   flux; `classifyFollowSpectrum` ranks the 13 known notes by template match (templates derived
-   from `NOTES`×`TIMBRE`, fundamental overweighted); the cursor advances via the same
-   `highlightToken` used by playback. All tuning constants live in the `FOLLOW` object. Native
-   wrappers need mic permission: `RECORD_AUDIO` in the Android manifest, and codemagic.yaml
-   injects `NSMicrophoneUsageDescription` into the regenerated iOS Info.plist.
+   no AGC/echo-cancel) into two parallel `AnalyserNode`s — a short-window detector (2048) where
+   `followLoop` finds strike onsets via high-frequency-weighted spectral flux, and a fine-bin
+   classifier (8192) whose snapshots feed `classifyFollowSpectrum` as a post-minus-pre-onset
+   difference spectrum, so ringing tails from earlier strikes cancel out. Templates derive from
+   `NOTES`×`TIMBRE` (fundamental overweighted, octave-confusion penalty). Strict matching can
+   jump ahead (`catchUpAhead`) when the player has clearly moved on; the cursor advances via the
+   same `highlightToken` used by playback. All tuning constants live in the `FOLLOW` object and
+   the sensitivity slider scales the onset threshold. Native wrappers need mic permission:
+   `RECORD_AUDIO` in the Android manifest, and codemagic.yaml injects
+   `NSMicrophoneUsageDescription` into the regenerated iOS Info.plist.
 
 8. **Persistence** — two independent mechanisms: plain `.txt` export/import (works everywhere,
    the reliable fallback), and an in-browser "曲库" (score library) backed by `localStorage`

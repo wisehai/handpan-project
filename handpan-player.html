@@ -227,6 +227,11 @@
             7px calc(16px + env(safe-area-inset-left, 0px));
     background:var(--panel);border-bottom:1px solid var(--line);}
   #followBar button{padding:5px 12px;border-radius:999px;font-size:12px;}
+  #sensWrap input[type=range]{width:76px;}
+  #micMeter{flex:0 0 52px;height:6px;border:1px solid var(--line);border-radius:3px;
+    overflow:hidden;background:#0a0e12;}
+  #micMeter i{display:block;height:100%;width:0;background:var(--brass);
+    transition:width .08s linear;}
   .icon-toggle{position:relative;}
   .icon-toggle input{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;}
   .icon-toggle span{display:inline-block;border:1px solid var(--line);background:var(--panel-2);
@@ -248,6 +253,9 @@
 <div id="followBar" hidden>
   <button id="btnFollowExit" data-i18n="exitFollow">✕ Exit</button>
   <label class="chk"><input type="checkbox" id="chkLenient"><span data-i18n="lenient">Any-hit mode</span></label>
+  <label class="chk" id="sensWrap"><span data-i18n="sens">Sensitivity</span>
+    <input type="range" id="sensSlider" min="0.4" max="2.5" step="0.1" value="1"></label>
+  <span id="micMeter" title="mic level"><i></i></span>
   <span id="followState"></span>
 </div>
 <div class="wrap">
@@ -402,6 +410,7 @@ const I18N = {
     follow:     '🎤 Follow',
     exitFollow: '✕ Exit',
     lenient:    'Any-hit mode',
+    sens:       'Sensitivity',
     followListening: 'Listening…',
     followHeard: k => 'Heard: ' + k,
     followMicDenied: 'Microphone permission denied — follow mode unavailable',
@@ -466,6 +475,7 @@ const I18N = {
     follow:     '🎤 跟弹',
     exitFollow: '✕ 退出',
     lenient:    '宽松模式',
+    sens:       '灵敏度',
     followListening: '听音中…',
     followHeard: k => '识别到 ' + k,
     followMicDenied: '麦克风权限被拒绝，无法使用跟弹模式',
@@ -1550,24 +1560,39 @@ const followBar     = document.getElementById('followBar');
 const followState   = document.getElementById('followState');
 const chkLenient    = document.getElementById('chkLenient');
 
-const FOLLOW_FFT = 8192;
-/* Detection tuning — first calibrated against the app's own synthesis; expect
- * to revisit with real-pan feedback (mic distance, room, phone AGC).       */
+const FOLLOW_FFT = 8192;      // classification: 5.9 Hz bins resolve semitones
+const DETECT_FFT = 2048;      // onset detection: 43 ms window follows fast playing
+/* Detection tuning — revisit with real-pan feedback (mic distance, room,
+ * phone AGC). The sensitivity slider scales the onset threshold at runtime. */
 const FOLLOW = {
-  fluxRatio:    3.0,    // onset when flux exceeds this × its running average
-  minFlux:      0.02,   // absolute flux floor (linear magnitude sum)
+  fluxRatio:    2.3,    // onset when weighted flux exceeds this × its average
+  minFlux:      0.05,   // absolute flux floor (weighted linear magnitude sum)
   minLevelDb:   -68,    // ignore onsets whose loudest bin is below this
-  refractoryMs: 130,    // one strike = one onset
-  classifyDelayMs: 60,  // let partials develop past the strike noise
+  refractoryMs: 120,    // one strike = one onset
+  classifyDelayMs: 70,  // let partials develop past the strike noise
+  preSnapshotMs: 90,    // how far before the onset the reference spectrum sits
+  emaFreezeMs:  250,    // don't let a fresh strike raise the adaptive floor
   matchTopN:    2,      // expected note in top-N classifier picks = correct
+  catchUpAhead: 2,      // strict mode may jump this many playable columns ahead
   slapHighRatio: 0.9,   // high-band vs mid-band energy ratio that reads as S
 };
 
 let followOn = false, followPos = 0, followRaf = 0;
-let micStream = null, micSource = null, micAnalyser = null;
+let micStream = null, micSource = null, micAnalyser = null, micDetector = null;
 let followTpls = null, followBinHz = 0;
-let fluxEma = 0, lastOnsetAt = 0, specCur = null, specPrev = null, specReady = false;
-let wakeLock = null;
+let fluxEma = 0, lastOnsetAt = 0;
+let detCur = null, detPrev = null, detReady = false, detWeight = null, detLo = 0, detHi = 0;
+let snapRing = null, snapIdx = 0, preSpec = null, postSpec = null, deltaSpec = null;
+let meterFrame = 0, wakeLock = null;
+const sensSlider = document.getElementById('sensSlider');
+const micMeterFill = document.querySelector('#micMeter i');
+{
+  const saved = store() && store().getItem('handpan_sens');
+  if (saved && sensSlider) sensSlider.value = saved;
+}
+if (sensSlider) sensSlider.addEventListener('input', () => {
+  const s = store(); if (s) s.setItem('handpan_sens', sensSlider.value);
+});
 
 /* Spectral templates from the measured note tables: bin positions of the
  * fundamental and partials, fundamental overweighted so octave-sharing
@@ -1594,16 +1619,19 @@ function buildFollowTemplates(sampleRate){
   }
 }
 
-/* Rank all notes by template match against one dB spectrum snapshot.
+/* Rank all notes by template match against one LINEAR-magnitude spectrum.
+ * In follow mode this is a post-onset minus pre-onset difference spectrum,
+ * so notes still ringing from earlier strikes cancel out and only the new
+ * strike's energy is scored — long handpan sustain no longer masks it.
  * Returns [{key, score}] best-first; slap is prepended when the strike is
  * broadband-high with little tonal support.                               */
 function classifyFollowSpectrum(spec){
-  const lin = i => Math.pow(10, Math.max(-100, spec[i] || -100) / 20);
   // ±1 bin (≈±6 Hz): tolerant of slight detuning, tight enough to keep
   // semitone neighbours (A3 220 vs Bb3 233) from capturing each other.
   const peakAround = bin => {
     let m = 0;
-    for (let i = Math.max(1, bin - 1); i <= bin + 1 && i < spec.length; i++) m = Math.max(m, lin(i));
+    for (let i = Math.max(1, bin - 1); i <= bin + 1 && i < spec.length; i++)
+      if (spec[i] > m) m = spec[i];
     return m;
   };
   const scores = followTpls.map(t => {
@@ -1619,8 +1647,8 @@ function classifyFollowSpectrum(spec){
   }).sort((a, b) => b.score - a.score);
   const binAt = f => Math.max(1, Math.min(spec.length - 1, Math.round(f / followBinHz)));
   let mid = 0, high = 0;
-  for (let i = binAt(150), e = binAt(3500); i < e; i++) mid += lin(i);
-  for (let i = binAt(3500), e = binAt(9000); i < e; i++) high += lin(i);
+  for (let i = binAt(150), e = binAt(3500); i < e; i++) mid += spec[i];
+  for (let i = binAt(3500), e = binAt(9000); i < e; i++) high += spec[i];
   if (high > mid * FOLLOW.slapHighRatio)
     scores.unshift({key: 'S', score: (scores[0] ? scores[0].score : 0) + 1});
   return scores;
@@ -1648,10 +1676,23 @@ function followMiss(idx){
   col.addEventListener('animationend', () => col.classList.remove('miss'), {once: true});
 }
 
+// Advance the cursor past playable column idx and highlight the next target.
+function followAdvance(idx){
+  for (const h of events[idx].hits) flashPad(h.key, h.hand);
+  followPos = idx + 1;
+  const next = followTargetIdx();
+  if (next >= 0) highlightToken(next);
+}
+
 function handleFollowOnset(){
   if (!followOn) return;
-  micAnalyser.getFloatFrequencyData(specCur);
-  const scores = classifyFollowSpectrum(specCur);
+  micAnalyser.getFloatFrequencyData(postSpec);
+  for (let i = 0; i < deltaSpec.length; i++){
+    const post = Math.pow(10, Math.max(-100, postSpec[i]) / 20);
+    const pre = Math.pow(10, Math.max(-100, preSpec[i]) / 20);
+    deltaSpec[i] = post > pre ? post - pre : 0;
+  }
+  const scores = classifyFollowSpectrum(deltaSpec);
   if (!scores.length) return;
   followState.textContent = tr('followHeard', scores[0].key);
   const idx = followTargetIdx();
@@ -1659,38 +1700,72 @@ function handleFollowOnset(){
   const expected = events[idx].hits.map(h => h.key);
   const top = scores.slice(0, FOLLOW.matchTopN).map(s => s.key);
   if (chkLenient.checked || expected.some(k => top.includes(k))){
-    for (const h of events[idx].hits) flashPad(h.key, h.hand);
-    followPos = idx + 1;
-    const next = followTargetIdx();
-    if (next >= 0) highlightToken(next);
-  } else {
-    followMiss(idx);
+    followAdvance(idx);
+    return;
   }
+  // Catch-up: a confident exact match on one of the NEXT columns means the
+  // player is already past a missed detection — jump to them instead of
+  // pinning the cursor behind forever.
+  let ahead = idx;
+  for (let n = 0; n < FOLLOW.catchUpAhead; n++){
+    followPos = ahead + 1;
+    ahead = followTargetIdx();
+    if (ahead < 0 || ahead === idx) break;
+    if (events[ahead].hits.some(h => h.key === scores[0].key)){
+      followAdvance(ahead);
+      return;
+    }
+  }
+  followPos = idx;               // no catch-up match: stay put
+  followMiss(idx);
+}
+
+// Copy the ring snapshot closest to preSnapshotMs old as the onset reference.
+function capturePreSpec(now){
+  let best = null, bestErr = Infinity;
+  for (const slot of snapRing){
+    const err = Math.abs(now - slot.t - FOLLOW.preSnapshotMs);
+    if (err < bestErr){ bestErr = err; best = slot; }
+  }
+  if (best) preSpec.set(best.data);
 }
 
 function followLoop(){
   if (!followOn) return;
-  micAnalyser.getFloatFrequencyData(specCur);
-  const lo = Math.max(1, Math.round(75 / followBinHz));
-  const hi = Math.min(specCur.length, Math.round(9000 / followBinHz));
+  const now = performance.now();
+  // rotate a full-resolution snapshot; one of these becomes the "before the
+  // strike" reference that the difference spectrum subtracts
+  const slot = snapRing[snapIdx];
+  micAnalyser.getFloatFrequencyData(slot.data);
+  slot.t = now;
+  snapIdx = (snapIdx + 1) % snapRing.length;
+
+  // onset detection on the short-window analyser: high-frequency-weighted
+  // flux makes the strike's broadband attack stand out over ringing tails
+  micDetector.getFloatFrequencyData(detCur);
   let flux = 0, peakDb = -Infinity;
-  for (let i = lo; i < hi; i++){
-    const c = Math.pow(10, Math.max(-100, specCur[i]) / 20);
-    const p = Math.pow(10, Math.max(-100, specPrev[i]) / 20);
-    if (c > p) flux += c - p;
-    if (specCur[i] > peakDb) peakDb = specCur[i];
+  for (let i = detLo; i < detHi; i++){
+    const c = Math.pow(10, Math.max(-100, detCur[i]) / 20);
+    const p = Math.pow(10, Math.max(-100, detPrev[i]) / 20);
+    if (c > p) flux += (c - p) * detWeight[i];
+    if (detCur[i] > peakDb) peakDb = detCur[i];
   }
-  [specCur, specPrev] = [specPrev, specCur];
-  if (specReady){
-    const now = performance.now();
-    if (flux > Math.max(FOLLOW.minFlux, fluxEma * FOLLOW.fluxRatio) &&
+  [detCur, detPrev] = [detPrev, detCur];
+  if (micMeterFill && (meterFrame++ & 3) === 0)
+    micMeterFill.style.width = Math.max(0, Math.min(100, (peakDb + 80) * (100 / 55))) + '%';
+  if (detReady){
+    const sens = Number(sensSlider && sensSlider.value) || 1;
+    if (flux > Math.max(FOLLOW.minFlux, fluxEma * FOLLOW.fluxRatio) / sens &&
         peakDb > FOLLOW.minLevelDb && now - lastOnsetAt > FOLLOW.refractoryMs){
       lastOnsetAt = now;
+      capturePreSpec(now);
       setTimeout(handleFollowOnset, FOLLOW.classifyDelayMs);
     }
-    fluxEma = fluxEma * 0.95 + flux * 0.05;
+    // a fresh strike must not raise the adaptive floor and mask fast runs
+    if (now - lastOnsetAt > FOLLOW.emaFreezeMs)
+      fluxEma = fluxEma * 0.9 + flux * 0.1;
   }
-  specReady = true;
+  detReady = true;
   followRaf = requestAnimationFrame(followLoop);
 }
 
@@ -1718,14 +1793,28 @@ async function startFollow(){
   } catch (e){ setStatus('followMicDenied'); return; }
   micStream = stream;
   micSource = actx.createMediaStreamSource(stream);
-  micAnalyser = actx.createAnalyser();
+  micAnalyser = actx.createAnalyser();         // classification (fine bins)
   micAnalyser.fftSize = FOLLOW_FFT;
   micAnalyser.smoothingTimeConstant = 0;
+  micDetector = actx.createAnalyser();         // onset detection (short window)
+  micDetector.fftSize = DETECT_FFT;
+  micDetector.smoothingTimeConstant = 0;
   micSource.connect(micAnalyser);              // analysis only, never to output
+  micSource.connect(micDetector);
   buildFollowTemplates(actx.sampleRate);
-  specCur = new Float32Array(micAnalyser.frequencyBinCount);
-  specPrev = new Float32Array(micAnalyser.frequencyBinCount);
-  specReady = false; fluxEma = 0; lastOnsetAt = 0;
+  const bins = micAnalyser.frequencyBinCount, detBins = micDetector.frequencyBinCount;
+  const detBinHz = actx.sampleRate / DETECT_FFT;
+  preSpec = new Float32Array(bins); postSpec = new Float32Array(bins);
+  deltaSpec = new Float32Array(bins);
+  snapRing = Array.from({length: 8}, () => ({t: 0, data: new Float32Array(bins)}));
+  snapIdx = 0;
+  detCur = new Float32Array(detBins); detPrev = new Float32Array(detBins);
+  detLo = Math.max(1, Math.round(75 / detBinHz));
+  detHi = Math.min(detBins, Math.round(10000 / detBinHz));
+  detWeight = new Float32Array(detBins);
+  for (let i = detLo; i < detHi; i++)
+    detWeight[i] = Math.min(3, 0.5 + (i * detBinHz) / 3000);   // HFC emphasis
+  detReady = false; fluxEma = 0; lastOnsetAt = 0; meterFrame = 0;
   followOn = true;
   followPos = 0;
   document.body.classList.add('follow');
@@ -1747,7 +1836,8 @@ function stopFollow(){
   cancelAnimationFrame(followRaf);
   if (micSource) micSource.disconnect();
   if (micStream) micStream.getTracks().forEach(t => t.stop());
-  micStream = micSource = micAnalyser = null;
+  micStream = micSource = micAnalyser = micDetector = null;
+  snapRing = preSpec = postSpec = deltaSpec = detCur = detPrev = detWeight = null;
   document.body.classList.remove('follow');
   followBar.hidden = true;
   if (wakeLock){ try { wakeLock.release(); } catch (e){} wakeLock = null; }

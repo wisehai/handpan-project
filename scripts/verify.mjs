@@ -62,10 +62,10 @@ await check('delete restores default score', async () => {
   if (after !== defaultText) throw new Error('scoreText did not reset to the builtin default after delete');
 });
 
-await check('follow-mode classifier recognizes synthesized notes', async () => {
+await check('follow-mode classifier: clean notes + new note under sustain', async () => {
   const got = await page.evaluate(async () => {
-    // Render each note through the real synthesis path, FFT the attack the
-    // same way the live AnalyserNode sees it, and ask the classifier.
+    // Render through the real synthesis path, FFT windows the way the live
+    // AnalyserNode sees them, and ask the classifier (linear magnitudes).
     const sr = 48000;
     buildFollowTemplates(sr);
     const fft = (re, im) => {
@@ -89,33 +89,45 @@ await check('follow-mode classifier recognizes synthesized notes', async () => {
         }
       }
     };
-    const classifyRendered = async (key) => {
-      const ctx = new OfflineAudioContext(1, sr, sr);
+    const render = async (hits, seconds) => {
+      const ctx = new OfflineAudioContext(1, Math.ceil(sr * seconds), sr);
       const savedA = actx, savedM = master;
       actx = ctx;
       master = ctx.createGain(); master.gain.value = .7; master.connect(ctx.destination);
-      playHit(key, 0.02, 0.9);
+      for (const [key, t] of hits) playHit(key, t, 0.9);
       const rendered = await ctx.startRendering();
       actx = savedA; master = savedM;
-      const data = rendered.getChannelData(0);
+      return rendered.getChannelData(0);
+    };
+    const linSpec = (data, startSec) => {
       const re = new Float32Array(FOLLOW_FFT), im = new Float32Array(FOLLOW_FFT);
-      const start = Math.floor(0.02 * sr);
+      const start = Math.floor(startSec * sr);
       for (let i = 0; i < FOLLOW_FFT; i++){
         const w = .5 - .5 * Math.cos(2 * Math.PI * i / FOLLOW_FFT);   // Hann
         re[i] = (data[start + i] || 0) * w;
       }
       fft(re, im);
       const spec = new Float32Array(FOLLOW_FFT / 2);
-      for (let i = 0; i < spec.length; i++)
-        spec[i] = 20 * Math.log10(Math.hypot(re[i], im[i]) + 1e-12);
-      return classifyFollowSpectrum(spec)[0].key;
+      for (let i = 0; i < spec.length; i++) spec[i] = Math.hypot(re[i], im[i]);
+      return spec;
     };
     const out = {};
-    for (const key of ['2', '5', '8', 'D']) out[key] = await classifyRendered(key);
+    for (const key of ['2', '5', '8', 'D']){
+      const data = await render([[key, 0.02]], 1);
+      out[key] = classifyFollowSpectrum(linSpec(data, 0.02))[0].key;
+    }
+    // A '9' struck while '4' still rings: the raw post-onset spectrum is
+    // contaminated, but the pre/post difference must isolate the '9'.
+    const data = await render([['4', 0.02], ['9', 0.50]], 1.2);
+    const pre = linSpec(data, 0.24), post = linSpec(data, 0.40);
+    const delta = new Float32Array(pre.length);
+    for (let i = 0; i < delta.length; i++) delta[i] = Math.max(0, post[i] - pre[i]);
+    out.sustain = classifyFollowSpectrum(delta)[0].key;
     return out;
   });
-  for (const [want, heard] of Object.entries(got))
-    if (heard !== want) throw new Error(`played ${want}, classifier heard ${heard} (${JSON.stringify(got)})`);
+  for (const want of ['2', '5', '8', 'D'])
+    if (got[want] !== want) throw new Error(`played ${want}, classifier heard ${got[want]} (${JSON.stringify(got)})`);
+  if (got.sustain !== '9') throw new Error(`9 struck under 4's sustain heard as ${got.sustain}`);
 });
 
 await check('follow mode: fake mic starts, UI collapses, exit restores', async () => {

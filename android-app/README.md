@@ -55,6 +55,8 @@ $ANDROID_HOME/platform-tools/adb install -r android/app/build/outputs/apk/debug/
 
 - 这是 **debug** 签名的 APK，仅用于自己安装测试。要发布到应用商店需要生成正式签名密钥并构建
   release 包（`./gradlew assembleRelease`），目前没有配置。
+- 跟弹模式需要麦克风：`AndroidManifest.xml` 已声明 `RECORD_AUDIO`，首次使用时系统会弹权限
+  请求（Capacitor 会把 WebView 的 getUserMedia 请求转发给这个权限）。
 - PDF.js 随包放在 `vendor/pdfjs/`，PDF 识谱不会连接 CDN，也不会上传用户选择的 PDF 文件。
   其余功能（播放、乐谱编辑、曲库）同样离线可用。`AndroidManifest.xml` 目前仍保留 Capacitor
   默认生成的 `INTERNET` 权限。

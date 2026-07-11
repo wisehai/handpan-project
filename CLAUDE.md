@@ -67,7 +67,15 @@ Everything is in one `<script>` block in `handpan-player.html`, organized top-to
    real text layer (e.g. Notepan-exported scores) — scanned/rasterized PDFs have no text layer and
    will report zero systems found.
 
-7. **Persistence** — two independent mechanisms: plain `.txt` export/import (works everywhere,
+7. **Follow mode (跟弹)** — mic-driven score following: `startFollow` opens `getUserMedia` (raw,
+   no AGC/echo-cancel) into an `AnalyserNode`; `followLoop` detects strike onsets by spectral
+   flux; `classifyFollowSpectrum` ranks the 13 known notes by template match (templates derived
+   from `NOTES`×`TIMBRE`, fundamental overweighted); the cursor advances via the same
+   `highlightToken` used by playback. All tuning constants live in the `FOLLOW` object. Native
+   wrappers need mic permission: `RECORD_AUDIO` in the Android manifest, and codemagic.yaml
+   injects `NSMicrophoneUsageDescription` into the regenerated iOS Info.plist.
+
+8. **Persistence** — two independent mechanisms: plain `.txt` export/import (works everywhere,
    the reliable fallback), and an in-browser "曲库" (score library) backed by `localStorage`
    under key `handpan_scores_v1`, which self-hides (`libRow.style.display = 'none'`) when
    `localStorage` is unavailable (sandboxed previews, private browsing).

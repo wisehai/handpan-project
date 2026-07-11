@@ -195,11 +195,49 @@
   body.immersive .grid{grid-template-columns:1fr;gap:10px;
     margin-top:42px;}
   body.immersive .card{padding:10px;}
+
+  /* ---------- Follow mode (跟弹) ----------
+   * The score card's #trackView goes fixed-fullscreen; ancestors must stay
+   * rendered (display:none on them would remove the fixed child too), so we
+   * hide the page piecewise like immersive mode does. */
+  body.follow{overflow:hidden;}
+  body.follow header,
+  body.follow .grid > .card:first-child,
+  body.follow .card h2,
+  body.follow #libRow,
+  body.follow #editWrap,
+  body.follow #btnImmersive{display:none;}
+  body.follow #trackView{position:fixed;z-index:30;background:var(--bg);
+    left:0;right:0;bottom:0;top:calc(44px + env(safe-area-inset-top, 0px));
+    margin:0;border:none;border-radius:0;max-height:none;
+    padding:16px calc(20px + env(safe-area-inset-right, 0px))
+            calc(16px + env(safe-area-inset-bottom, 0px))
+            calc(20px + env(safe-area-inset-left, 0px));
+    font-size:clamp(17px, 4.6vmin, 32px);}
+  body.follow #trackView .cell{min-width:1.8em;}
+  body.follow #trackView .barcol{height:3.1em;margin:0 .45em;}
+  body.follow #trackView .vlabel{font-size:.5em;}
+  #followBar{position:fixed;z-index:31;left:0;right:0;top:0;
+    display:flex;gap:14px;align-items:center;
+    padding:calc(7px + env(safe-area-inset-top, 0px))
+            calc(16px + env(safe-area-inset-right, 0px))
+            7px calc(16px + env(safe-area-inset-left, 0px));
+    background:var(--panel);border-bottom:1px solid var(--line);}
+  #followBar button{padding:5px 12px;border-radius:999px;font-size:12px;}
+  #followState{margin-left:auto;font-size:13px;color:var(--muted);
+    font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;}
+  @keyframes missFlash{0%{background:#a04848;}100%{background:transparent;}}
+  .col.miss{animation:missFlash .5s ease-out;}
 </style>
 </head>
 <body>
 <button id="updateBanner" class="update-banner" data-i18n="updateReady" hidden>New version available — tap to refresh</button>
 <button id="btnImmersive" class="immersive-toggle" data-i18n="immersive">⛶ Focus</button>
+<div id="followBar" hidden>
+  <button id="btnFollowExit" data-i18n="exitFollow">✕ Exit</button>
+  <label class="chk"><input type="checkbox" id="chkLenient"><span data-i18n="lenient">Any-hit mode</span></label>
+  <span id="followState"></span>
+</div>
 <div class="wrap">
   <header>
     <div class="title-row">
@@ -227,6 +265,7 @@
         <button class="primary" id="btnPlay" data-i18n="play">▶ Play</button>
         <label class="chk"><input type="checkbox" id="chkLoop"><span data-i18n="loop">Loop</span></label>
         <label class="chk"><input type="checkbox" id="chkMetro"><span data-i18n="metro">Metronome</span></label>
+        <button id="btnFollow" data-i18n="follow">🎤 Follow</button>
       </div>
 
       <div class="sliders">
@@ -344,6 +383,13 @@ const I18N = {
     updateReady: 'New version available — tap to refresh',
     immersive:  '⛶ Focus',
     exitImmersive: '✕ Exit',
+    follow:     '🎤 Follow',
+    exitFollow: '✕ Exit',
+    lenient:    'Any-hit mode',
+    followListening: 'Listening…',
+    followHeard: k => 'Heard: ' + k,
+    followMicDenied: 'Microphone permission denied — follow mode unavailable',
+    followNoMic: 'Microphone unavailable here (needs HTTPS or the installed app)',
   },
   zh: {
     title:      '悟<em>碟</em>',
@@ -401,6 +447,13 @@ const I18N = {
     updateReady: '有新版本，点击刷新',
     immersive:  '⛶ 沉浸',
     exitImmersive: '✕ 退出',
+    follow:     '🎤 跟弹',
+    exitFollow: '✕ 退出',
+    lenient:    '宽松模式',
+    followListening: '听音中…',
+    followHeard: k => '识别到 ' + k,
+    followMicDenied: '麦克风权限被拒绝，无法使用跟弹模式',
+    followNoMic: '当前环境不支持麦克风（需要 HTTPS 或安装版应用）',
   },
 };
 
@@ -1442,7 +1495,229 @@ function setImmersive(v){
 }
 btnImmersive.addEventListener('click', () => setImmersive(!immersive));
 
+/* ==================== Follow mode (跟弹) ==============================
+ * The mic drives the score cursor instead of the scheduler: detect strike
+ * onsets in the input spectrum, classify them against the pan's 13 known
+ * notes, and advance the highlighted column when the expected note is heard.
+ * The highlighted column is always "the note to play next".              */
+const btnFollow     = document.getElementById('btnFollow');
+const btnFollowExit = document.getElementById('btnFollowExit');
+const followBar     = document.getElementById('followBar');
+const followState   = document.getElementById('followState');
+const chkLenient    = document.getElementById('chkLenient');
+
+const FOLLOW_FFT = 8192;
+/* Detection tuning — first calibrated against the app's own synthesis; expect
+ * to revisit with real-pan feedback (mic distance, room, phone AGC).       */
+const FOLLOW = {
+  fluxRatio:    3.0,    // onset when flux exceeds this × its running average
+  minFlux:      0.02,   // absolute flux floor (linear magnitude sum)
+  minLevelDb:   -68,    // ignore onsets whose loudest bin is below this
+  refractoryMs: 130,    // one strike = one onset
+  classifyDelayMs: 60,  // let partials develop past the strike noise
+  matchTopN:    2,      // expected note in top-N classifier picks = correct
+  slapHighRatio: 0.9,   // high-band vs mid-band energy ratio that reads as S
+};
+
+let followOn = false, followPos = 0, followRaf = 0;
+let micStream = null, micSource = null, micAnalyser = null;
+let followTpls = null, followBinHz = 0;
+let fluxEma = 0, lastOnsetAt = 0, specCur = null, specPrev = null, specReady = false;
+let wakeLock = null;
+
+/* Spectral templates from the measured note tables: bin positions of the
+ * fundamental and partials, fundamental overweighted so octave-sharing
+ * fields (e.g. 4 = D4 = 2× the Ding) resolve to the struck note.          */
+function buildFollowTemplates(sampleRate){
+  followBinHz = sampleRate / FOLLOW_FFT;
+  followTpls = [];
+  for (const key of Object.keys(TIMBRE)){
+    const note = NOTES[key];
+    if (!note) continue;
+    const parts = [];
+    for (const [mult, amp] of TIMBRE[key].partials){
+      const freq = note.freq * mult;
+      if (freq < 70 || freq > 8500) continue;
+      parts.push({bin: Math.round(freq / followBinHz), w: mult === 1 ? 2.5 : Math.min(1, amp)});
+    }
+    followTpls.push({key, parts, wSum: parts.reduce((s, p) => s + p.w, 0),
+      fundBin: Math.round(note.freq / followBinHz),
+      subBin: note.freq / 2 >= 70 ? Math.round(note.freq / 2 / followBinHz) : 0,
+      // only notes with a genuinely strong sub-fundamental mode (T: D3 under
+      // the D4 shoulder) are exempt from the octave-confusion penalty below;
+      // faint sub partials (10, 11) must not shield against it
+      hasSubPartial: TIMBRE[key].partials.some(p => p[0] < 0.9 && p[1] >= 0.3)});
+  }
+}
+
+/* Rank all notes by template match against one dB spectrum snapshot.
+ * Returns [{key, score}] best-first; slap is prepended when the strike is
+ * broadband-high with little tonal support.                               */
+function classifyFollowSpectrum(spec){
+  const lin = i => Math.pow(10, Math.max(-100, spec[i] || -100) / 20);
+  // ±1 bin (≈±6 Hz): tolerant of slight detuning, tight enough to keep
+  // semitone neighbours (A3 220 vs Bb3 233) from capturing each other.
+  const peakAround = bin => {
+    let m = 0;
+    for (let i = Math.max(1, bin - 1); i <= bin + 1 && i < spec.length; i++) m = Math.max(m, lin(i));
+    return m;
+  };
+  const scores = followTpls.map(t => {
+    let s = 0;
+    for (const p of t.parts) s += p.w * peakAround(p.bin);
+    s /= t.wSum;
+    // Octave disambiguation: strong energy one octave below the candidate's
+    // fundamental means the lower note was struck and we're seeing its 2×
+    // partial (e.g. 4 = D4 rings loudest at D5, which would fool 10 = D5).
+    if (!t.hasSubPartial && t.subBin && peakAround(t.subBin) > peakAround(t.fundBin) * 0.5)
+      s *= 0.4;
+    return {key: t.key, score: s};
+  }).sort((a, b) => b.score - a.score);
+  const binAt = f => Math.max(1, Math.min(spec.length - 1, Math.round(f / followBinHz)));
+  let mid = 0, high = 0;
+  for (let i = binAt(150), e = binAt(3500); i < e; i++) mid += lin(i);
+  for (let i = binAt(3500), e = binAt(9000); i < e; i++) high += lin(i);
+  if (high > mid * FOLLOW.slapHighRatio)
+    scores.unshift({key: 'S', score: (scores[0] ? scores[0].score : 0) + 1});
+  return scores;
+}
+
+// The column the player should hit next: skip rests, wrap at the end.
+function followTargetIdx(){
+  let i = followPos;
+  while (i < events.length && !events[i].hits.length) i++;
+  if (i >= events.length){
+    i = 0;
+    while (i < events.length && !events[i].hits.length) i++;
+    if (i >= events.length) return -1;
+    followPos = i;
+  }
+  return i;
+}
+
+function followMiss(idx){
+  const col = trackView.querySelector('.col[data-event="' + idx + '"]');
+  if (!col) return;
+  col.classList.remove('miss');
+  void col.offsetWidth;                       // restart the animation
+  col.classList.add('miss');
+  col.addEventListener('animationend', () => col.classList.remove('miss'), {once: true});
+}
+
+function handleFollowOnset(){
+  if (!followOn) return;
+  micAnalyser.getFloatFrequencyData(specCur);
+  const scores = classifyFollowSpectrum(specCur);
+  if (!scores.length) return;
+  followState.textContent = tr('followHeard', scores[0].key);
+  const idx = followTargetIdx();
+  if (idx < 0) return;
+  const expected = events[idx].hits.map(h => h.key);
+  const top = scores.slice(0, FOLLOW.matchTopN).map(s => s.key);
+  if (chkLenient.checked || expected.some(k => top.includes(k))){
+    for (const h of events[idx].hits) flashPad(h.key, h.hand);
+    followPos = idx + 1;
+    const next = followTargetIdx();
+    if (next >= 0) highlightToken(next);
+  } else {
+    followMiss(idx);
+  }
+}
+
+function followLoop(){
+  if (!followOn) return;
+  micAnalyser.getFloatFrequencyData(specCur);
+  const lo = Math.max(1, Math.round(75 / followBinHz));
+  const hi = Math.min(specCur.length, Math.round(9000 / followBinHz));
+  let flux = 0, peakDb = -Infinity;
+  for (let i = lo; i < hi; i++){
+    const c = Math.pow(10, Math.max(-100, specCur[i]) / 20);
+    const p = Math.pow(10, Math.max(-100, specPrev[i]) / 20);
+    if (c > p) flux += c - p;
+    if (specCur[i] > peakDb) peakDb = specCur[i];
+  }
+  [specCur, specPrev] = [specPrev, specCur];
+  if (specReady){
+    const now = performance.now();
+    if (flux > Math.max(FOLLOW.minFlux, fluxEma * FOLLOW.fluxRatio) &&
+        peakDb > FOLLOW.minLevelDb && now - lastOnsetAt > FOLLOW.refractoryMs){
+      lastOnsetAt = now;
+      setTimeout(handleFollowOnset, FOLLOW.classifyDelayMs);
+    }
+    fluxEma = fluxEma * 0.95 + flux * 0.05;
+  }
+  specReady = true;
+  followRaf = requestAnimationFrame(followLoop);
+}
+
+async function acquireWakeLock(){
+  try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e){ wakeLock = null; }
+}
+document.addEventListener('visibilitychange', () => {
+  if (followOn && document.visibilityState === 'visible') acquireWakeLock();
+});
+
+async function startFollow(){
+  if (followOn) return;
+  if (!events.some(e => e.hits.length)){ setStatus('emptyScore'); return; }
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
+    setStatus('followNoMic'); return;
+  }
+  ensureCtx();
+  stopPlay(true);
+  let stream;
+  try {
+    // Raw signal: phone-side echo cancellation / AGC would eat the very
+    // transients and level differences the detector keys on.
+    stream = await navigator.mediaDevices.getUserMedia({audio: {
+      echoCancellation: false, noiseSuppression: false, autoGainControl: false}});
+  } catch (e){ setStatus('followMicDenied'); return; }
+  micStream = stream;
+  micSource = actx.createMediaStreamSource(stream);
+  micAnalyser = actx.createAnalyser();
+  micAnalyser.fftSize = FOLLOW_FFT;
+  micAnalyser.smoothingTimeConstant = 0;
+  micSource.connect(micAnalyser);              // analysis only, never to output
+  buildFollowTemplates(actx.sampleRate);
+  specCur = new Float32Array(micAnalyser.frequencyBinCount);
+  specPrev = new Float32Array(micAnalyser.frequencyBinCount);
+  specReady = false; fluxEma = 0; lastOnsetAt = 0;
+  followOn = true;
+  followPos = 0;
+  document.body.classList.add('follow');
+  followBar.hidden = false;
+  followState.textContent = tr('followListening');
+  const first = followTargetIdx();
+  if (first >= 0) highlightToken(first);
+  // Best-effort niceties; each is unsupported somewhere (iOS: both).
+  try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch (e){}
+  try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch (e){}
+  acquireWakeLock();
+  followRaf = requestAnimationFrame(followLoop);
+}
+
+function stopFollow(){
+  if (!followOn) return;
+  followOn = false;
+  cancelAnimationFrame(followRaf);
+  if (micSource) micSource.disconnect();
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  micStream = micSource = micAnalyser = null;
+  document.body.classList.remove('follow');
+  followBar.hidden = true;
+  if (wakeLock){ try { wakeLock.release(); } catch (e){} wakeLock = null; }
+  try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e){}
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  trackView.querySelectorAll('.col.now').forEach(n => n.classList.remove('now'));
+  setStatus('stopped');
+}
+
+btnFollow.addEventListener('click', startFollow);
+btnFollowExit.addEventListener('click', stopFollow);
+
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && followOn){ stopFollow(); return; }
+  if (followOn) return;
   const ae = document.activeElement;
   if (e.code === 'Space' && ae !== scoreText &&
       !['BUTTON', 'INPUT', 'SELECT'].includes(ae.tagName)){

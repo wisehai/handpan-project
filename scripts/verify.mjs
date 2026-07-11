@@ -1,5 +1,5 @@
-// Throwaway Playwright smoke test for the three fixes from this session:
-// dialog centering, delete-restores-default, and the SW update banner.
+// Browser smoke tests: dialogs, library persistence, the SW update banner,
+// and follow mode (fake mic stream + note-classifier self-test).
 // Run with: node scripts/verify.mjs   (serves the repo root on :8934 itself)
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
@@ -22,7 +22,11 @@ const server = createServer(async (req, res) => {
 });
 await new Promise(r => server.listen(PORT, r));
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ args: [
+  '--use-fake-ui-for-media-stream',      // auto-grant the mic permission prompt
+  '--use-fake-device-for-media-stream',  // synthetic mic input for follow mode
+  '--autoplay-policy=no-user-gesture-required',
+]});
 const page = await browser.newPage();
 const results = [];
 
@@ -56,6 +60,80 @@ await check('delete restores default score', async () => {
   await page.click('#btnLibDel');   // confirm
   const after = await page.locator('#scoreText').inputValue();
   if (after !== defaultText) throw new Error('scoreText did not reset to the builtin default after delete');
+});
+
+await check('follow-mode classifier recognizes synthesized notes', async () => {
+  const got = await page.evaluate(async () => {
+    // Render each note through the real synthesis path, FFT the attack the
+    // same way the live AnalyserNode sees it, and ask the classifier.
+    const sr = 48000;
+    buildFollowTemplates(sr);
+    const fft = (re, im) => {
+      const n = re.length;
+      for (let i = 1, j = 0; i < n; i++){
+        let bit = n >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j |= bit;
+        if (i < j){ [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; }
+      }
+      for (let len = 2; len <= n; len <<= 1){
+        const ang = -2 * Math.PI / len;
+        for (let i = 0; i < n; i += len){
+          for (let k = 0; k < len / 2; k++){
+            const c = Math.cos(ang * k), s = Math.sin(ang * k);
+            const vr = re[i + k + len / 2] * c - im[i + k + len / 2] * s;
+            const vi = re[i + k + len / 2] * s + im[i + k + len / 2] * c;
+            re[i + k + len / 2] = re[i + k] - vr; im[i + k + len / 2] = im[i + k] - vi;
+            re[i + k] += vr; im[i + k] += vi;
+          }
+        }
+      }
+    };
+    const classifyRendered = async (key) => {
+      const ctx = new OfflineAudioContext(1, sr, sr);
+      const savedA = actx, savedM = master;
+      actx = ctx;
+      master = ctx.createGain(); master.gain.value = .7; master.connect(ctx.destination);
+      playHit(key, 0.02, 0.9);
+      const rendered = await ctx.startRendering();
+      actx = savedA; master = savedM;
+      const data = rendered.getChannelData(0);
+      const re = new Float32Array(FOLLOW_FFT), im = new Float32Array(FOLLOW_FFT);
+      const start = Math.floor(0.02 * sr);
+      for (let i = 0; i < FOLLOW_FFT; i++){
+        const w = .5 - .5 * Math.cos(2 * Math.PI * i / FOLLOW_FFT);   // Hann
+        re[i] = (data[start + i] || 0) * w;
+      }
+      fft(re, im);
+      const spec = new Float32Array(FOLLOW_FFT / 2);
+      for (let i = 0; i < spec.length; i++)
+        spec[i] = 20 * Math.log10(Math.hypot(re[i], im[i]) + 1e-12);
+      return classifyFollowSpectrum(spec)[0].key;
+    };
+    const out = {};
+    for (const key of ['2', '5', '8', 'D']) out[key] = await classifyRendered(key);
+    return out;
+  });
+  for (const [want, heard] of Object.entries(got))
+    if (heard !== want) throw new Error(`played ${want}, classifier heard ${heard} (${JSON.stringify(got)})`);
+});
+
+await check('follow mode: fake mic starts, UI collapses, exit restores', async () => {
+  await page.click('#btnFollow');
+  await page.waitForSelector('body.follow', { timeout: 5000 });
+  const state = await page.evaluate(() => ({
+    mic: !!micAnalyser,
+    barShown: !document.getElementById('followBar').hidden,
+    panHidden: getComputedStyle(document.querySelector('.grid > .card:first-child')).display === 'none',
+    trackFixed: getComputedStyle(document.getElementById('trackView')).position === 'fixed',
+    cursorSet: !!document.querySelector('#trackView .col.now'),
+  }));
+  for (const [k, v] of Object.entries(state))
+    if (!v) throw new Error(`after entering follow mode, ${k} is false`);
+  await page.click('#btnFollowExit');
+  await page.waitForFunction(() => !document.body.classList.contains('follow'));
+  const after = await page.evaluate(() => ({ micGone: !micStream && !micAnalyser }));
+  if (!after.micGone) throw new Error('mic stream still open after exiting follow mode');
 });
 
 await check('SW update banner appears after CACHE_NAME bump + reload', async () => {

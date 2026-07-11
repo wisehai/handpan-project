@@ -28,6 +28,8 @@ PWA 部分）。
 - 播放 / 循环 / 节拍器
 - 两行文本乐谱格式（R: 右手 / L: 左手），可直接编辑
 - 从 PDF 识别乐谱（仅支持带真实文字层的矢量 PDF，扫描件/纯图形谱目前无法识别）
+- 跟弹模式：横屏全屏只显示动态谱，麦克风识别你在真实手碟上弹的音，弹对了光标自动前进
+  （需要麦克风权限；网页版需 HTTPS。识别不准或环境嘈杂时可打开「宽松模式」，任意敲击即前进）
 
 ### PWA（添加到主屏幕）
 
@@ -82,6 +84,9 @@ Just open `handpan-player.html` in a browser.
 - Two-row text score format (R: right hand / L: left hand), directly editable
 - Recognize scores from PDF (only vector PDFs with a real text layer — scanned or graphics-only
   scores aren't supported yet)
+- Follow mode: a fullscreen landscape score view where the microphone recognizes what you play on
+  your real handpan and the cursor advances as you play (needs mic permission; HTTPS on the web.
+  An "any-hit" fallback advances on any strike when recognition struggles)
 
 ### PWA (Add to Home Screen)
 

@@ -774,9 +774,17 @@ const TIMBRE = {
   '11': { dur:3.8, partials:[[.5,.05,.8],[1,1,1],[2,.03,.6]] },
 };
 
-/* Tone field / ding / shoulder: additive partials per TIMBRE, each with its
- * own envelope, plus a strike-noise burst and a faint ~76 Hz body resonance
- * (Helmholtz thump — present on every strike in the recordings).
+// strike-noise burst applied in playHit: fixed across every note (not
+// scaled to note.freq) so the attack "click" feels the same at any pitch;
+// amplitude is ~1/3 of the original per-note-scaled level.
+const HIT_NOISE_F = 400, HIT_NOISE_AMP = 0.35 / 3;
+
+/* Tone field / ding / shoulder: additive partials per TIMBRE, each with a
+ * faint ~76 Hz body resonance (Helmholtz thump — present on every strike
+ * in the recordings) plus a quiet strike-noise burst. The burst uses a
+ * fixed center frequency/gain for every note (not scaled to note.freq) —
+ * scaling it with pitch made high notes (9-11) read as an S-slap-like
+ * "scratch" since their noise band crept into the ear's most sensitive range.
  * Slap (S): unpitched — body thump + band-passed noise crack.           */
 function playHit(key, t, vel){
   if (key === 'S'){ playSlap(t, vel); return; }
@@ -784,8 +792,6 @@ function playHit(key, t, vel){
   if (!note || !tim) return;
 
   const dur = tim.dur, partials = tim.partials;
-  const noiseF = note.freq * (note.shoulder ? 3 : 2.5);
-  const noiseAmp = note.shoulder ? 0.30 : 0.35;
 
   // static hit gain, normalized so octave-heavy notes (4, 7) don't jump out
   const ampSum = partials.reduce((s, p) => s + p[1], 0);
@@ -817,15 +823,15 @@ function playHit(key, t, vel){
   bo.connect(bg); bg.connect(g);
   bo.start(t); bo.stop(t + 1.1);
 
-  // attack transient: 30 ms band-passed noise burst
+  // attack transient: 30 ms band-passed noise burst, same for every note
   const nLen = Math.floor(actx.sampleRate * 0.03);
   const buf = actx.createBuffer(1, nLen, actx.sampleRate);
   const ch = buf.getChannelData(0);
   for (let i = 0; i < nLen; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / nLen);
   const src = actx.createBufferSource(); src.buffer = buf;
   const bp = actx.createBiquadFilter();
-  bp.type = 'bandpass'; bp.frequency.value = noiseF; bp.Q.value = 1.2;
-  const ng = actx.createGain(); ng.gain.value = noiseAmp * vel;
+  bp.type = 'bandpass'; bp.frequency.value = HIT_NOISE_F; bp.Q.value = 1.2;
+  const ng = actx.createGain(); ng.gain.value = HIT_NOISE_AMP * vel;
   src.connect(bp); bp.connect(ng); ng.connect(g);
   src.start(t);
 }

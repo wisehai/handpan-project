@@ -139,6 +139,32 @@ await check('follow mode: fake mic starts, UI collapses, exit restores', async (
   if (!after.micGone) throw new Error('mic stream still open after exiting follow mode');
 });
 
+await check('transport controls share one row on narrow phones', async () => {
+  for (const width of [390, 360]){
+    await page.setViewportSize({ width, height: 844 });
+    for (const lang of ['en', 'zh']){    // label widths differ per language
+      await page.evaluate(l => setLang(l), lang);
+      const tops = await page.evaluate(() =>
+        [...document.querySelectorAll('.transport > *')].map(el => el.offsetTop));
+      if (tops.length < 4) throw new Error(`expected 4 transport controls, found ${tops.length}`);
+      // centering can offset heterogeneous controls by a few px; a wrap is a full row (~38px)
+      if (Math.max(...tops) - Math.min(...tops) > 15)
+        throw new Error(`controls wrap at ${width}px (${lang}): offsetTops ${tops.join(',')}`);
+    }
+  }
+  await page.evaluate(() => setLang('en'));
+  await page.setViewportSize({ width: 1280, height: 720 });
+});
+
+await check('metronome ticks standalone while stopped', async () => {
+  await page.locator('label:has(#chkMetro)').click();
+  const on = await page.evaluate(() => ({ checked: chkMetro.checked, ticking: !!metroTimer }));
+  if (!on.checked || !on.ticking) throw new Error(`after checking: ${JSON.stringify(on)}`);
+  await page.locator('label:has(#chkMetro)').click();
+  const off = await page.evaluate(() => ({ checked: chkMetro.checked, ticking: !!metroTimer }));
+  if (off.checked || off.ticking) throw new Error(`after unchecking: ${JSON.stringify(off)}`);
+});
+
 await check('SW update banner appears after CACHE_NAME bump + reload', async () => {
   const swPath = join(ROOT, 'sw.js');
   const original = await readFile(swPath, 'utf8');

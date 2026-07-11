@@ -99,13 +99,13 @@
     vertical-align:-1px;}
 
   /* ---------- Transport ---------- */
-  .transport{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
+  /* compact enough that Play/Follow/loop/metronome share one row on phones */
+  .transport{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:14px;}
   button{font:inherit;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);
-    border-radius:9px;padding:9px 16px;cursor:pointer;letter-spacing:.03em;}
+    border-radius:9px;padding:9px 11px;cursor:pointer;letter-spacing:.03em;}
   button:hover{border-color:var(--brass-dp);}
   button:focus-visible{outline:2px solid var(--brass);outline-offset:2px;}
-  button.primary{background:var(--brass);border-color:var(--brass);color:#20160a;font-weight:600;
-    min-width:96px;}
+  button.primary{background:var(--brass);border-color:var(--brass);color:#20160a;font-weight:600;}
   button.primary:hover{background:#e4b26c;}
   label.chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);
     cursor:pointer;user-select:none;}
@@ -230,8 +230,8 @@
   .icon-toggle{position:relative;}
   .icon-toggle input{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;}
   .icon-toggle span{display:inline-block;border:1px solid var(--line);background:var(--panel-2);
-    border-radius:9px;padding:7px 14px;font-size:18px;line-height:1.15;cursor:pointer;
-    min-width:46px;text-align:center;}
+    border-radius:9px;padding:7px 10px;font-size:18px;line-height:1.15;cursor:pointer;
+    min-width:42px;text-align:center;}
   .icon-toggle span:hover{border-color:var(--brass-dp);}
   .icon-toggle input:checked + span{background:var(--brass);border-color:var(--brass);
     color:#20160a;font-weight:600;}
@@ -1059,6 +1059,7 @@ function startFrom(evIdx){
   requestAnimationFrame(visLoop);
   btnPlay.textContent = tr('pause');
   setStatus('playingAt', bpmSlider.value);
+  updateStandaloneMetro();     // playback's scheduler owns the ticking now
 }
 
 function stopPlay(silent){
@@ -1070,7 +1071,34 @@ function stopPlay(silent){
   btnPlay.textContent = tr('play');
   trackView.querySelectorAll('.col.now').forEach(n => n.classList.remove('now'));
   if (!silent){ setStatus('stopped'); }
+  updateStandaloneMetro();     // still checked -> resume standalone ticking
 }
+
+/* Standalone metronome: ticks on its own while nothing is playing, so the
+ * toggle responds audibly the moment it's checked; during playback the main
+ * scheduler owns the ticking (and this stands down) to stay score-synced.  */
+let metroTimer = null, metroNextTime = 0, metroBeat = 0;
+function metroScheduler(){
+  while (metroNextTime < actx.currentTime + LOOKAHEAD_S){
+    playTick(metroNextTime, metroBeat % 4 === 0);
+    metroNextTime += 60 / Number(bpmSlider.value);   // live BPM each beat
+    metroBeat++;
+  }
+}
+function updateStandaloneMetro(){
+  const want = chkMetro.checked && !playing && !followOn;
+  if (want && !metroTimer){
+    ensureCtx();
+    metroBeat = 0;
+    metroNextTime = actx.currentTime + 0.1;
+    metroTimer = setInterval(metroScheduler, TIMER_MS);
+    metroScheduler();
+  } else if (!want && metroTimer){
+    clearInterval(metroTimer);
+    metroTimer = null;
+  }
+}
+chkMetro.addEventListener('change', updateStandaloneMetro);
 
 /* ============================ Wire up UI ============================= */
 btnPlay.addEventListener('click', () => { playing ? stopPlay() : startFrom(pos); });
@@ -1709,6 +1737,7 @@ async function startFollow(){
   try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch (e){}
   try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch (e){}
   acquireWakeLock();
+  updateStandaloneMetro();     // silence the metronome while following
   followRaf = requestAnimationFrame(followLoop);
 }
 
@@ -1726,6 +1755,7 @@ function stopFollow(){
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   trackView.querySelectorAll('.col.now').forEach(n => n.classList.remove('now'));
   setStatus('stopped');
+  updateStandaloneMetro();
 }
 
 btnFollow.addEventListener('click', startFollow);

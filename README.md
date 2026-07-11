@@ -26,6 +26,7 @@ PWA 部分）。
 
 - 手碟 SVG 可视化，支持点击/触摸敲击，也支持多指同时按住多个音（真实和弦手感）
 - 播放 / 循环 / 节拍器
+- PDF 中的多段 BPM 可随播放位置自动切换，并可用速度倍率整体快放或慢放
 - 两行文本乐谱格式（R: 右手 / L: 左手），可直接编辑
 - 从 PDF 识别乐谱（仅支持带真实文字层的矢量 PDF，扫描件/纯图形谱目前无法识别）
 - 跟弹模式：横屏全屏只显示动态谱，麦克风识别你在真实手碟上弹的音，弹对了光标自动前进
@@ -81,6 +82,7 @@ Just open `handpan-player.html` in a browser.
 - SVG handpan visualization — click/tap to play, with true multi-touch chords (hold several notes
   at once, just like a real handpan)
 - Play / Loop / Metronome
+- Multiple PDF tempo changes are followed automatically, with a global practice-speed scale
 - Two-row text score format (R: right hand / L: left hand), directly editable
 - Recognize scores from PDF (only vector PDFs with a real text layer — scanned or graphics-only
   scores aren't supported yet)

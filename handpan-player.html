@@ -302,7 +302,7 @@
 
       <div class="sliders">
         <div class="slider-row">
-          <span data-i18n="bpmLabel">Tempo BPM</span>
+          <span id="bpmLabel" data-i18n="bpmLabel">Tempo BPM</span>
           <input type="range" id="bpm" min="50" max="200" value="110" step="1">
           <output id="bpmVal">110</output>
         </div>
@@ -373,6 +373,7 @@ const I18N = {
     loop:       'Loop',
     metro:      'Metronome',
     bpmLabel:   'Tempo BPM',
+    tempoScaleLabel: 'Tempo scale',
     volLabel:   'Volume',
     scoreTitle: 'Score',
     editScore:  'Edit score (two-row notation)',
@@ -390,11 +391,14 @@ const I18N = {
     builtinGroup: 'Built-in',
     userGroup:  'My scores',
     hint: 'Tokens: <code>D</code> Ding, <code>1</code>–<code>11</code> tone fields, <code>T</code> shoulder, ' +
-          '<code>S</code> slap, <code>.</code> rest, <code>|</code> barline (display only), <code>#</code> comment line. ' +
+          '<code>S</code> slap, <code>.</code> rest, <code>|</code> barline (display only), <code>#</code> comment line, ' +
+          '<code>@BPM 95</code> tempo change. ' +
           'Click any column below to play from there.',
     playFromHere: 'Play from here',
     emptyScore: 'Score is empty — enter some tokens first.',
     playingAt:  bpm => 'Playing · ' + bpm + ' BPM',
+    playingAtScore: (actual, written, scale) =>
+      'Playing · ' + actual + ' BPM (score ' + written + ' × ' + scale + '%)',
     stopped:    'Stopped',
     slotCount:  n => n + ' eighth-note slots',
     rlMismatch: (r, l) => 'R/L column counts differ in a block (R=' + r + ', L=' + l + '); the shorter row is padded with rests',
@@ -409,6 +413,7 @@ const I18N = {
     pdfHeader:  n => '# Recognized from PDF: ' + n + ' (verify rhythm & hands)',
     pdfPage:    p => '# Page ' + p,
     pdfMeasures: ns => '# Measures ' + ns.join(' · '),
+    tempoMarker: bpm => '♩ = ' + bpm + ' BPM',
     ariaPan:    'Handpan layout',
     ariaSlap:   'Slap (shell)',
     ariaT:      'Shoulder tone T',
@@ -438,6 +443,7 @@ const I18N = {
     loop:       '循环',
     metro:      '节拍器',
     bpmLabel:   '速度 BPM',
+    tempoScaleLabel: '速度倍率',
     volLabel:   '音量',
     scoreTitle: '乐谱',
     editScore:  '编辑乐谱（双行记法）',
@@ -456,11 +462,14 @@ const I18N = {
     userGroup:  '我的曲子',
     hint: '记号：<code>D</code> Ding，<code>1</code>–<code>11</code> 音区，' +
           '<code>T</code> 肩音，<code>S</code> Slap，<code>.</code> 休止，' +
-          '<code>|</code> 小节线（仅显示），<code>#</code> 注释行。' +
+          '<code>|</code> 小节线（仅显示），<code>#</code> 注释行，' +
+          '<code>@BPM 95</code> 速度变化。' +
           '点击下方任意列可从该处播放。',
     playFromHere: '从这里播放',
     emptyScore: '乐谱为空，请先输入记号。',
     playingAt:  bpm => '播放中 · ' + bpm + ' BPM',
+    playingAtScore: (actual, written, scale) =>
+      '播放中 · ' + actual + ' BPM（谱面 ' + written + ' × ' + scale + '%）',
     stopped:    '已停止',
     slotCount:  n => '共 ' + n + ' 个八分音符',
     rlMismatch: (r, l) => '某组 R/L 列数不一致（R=' + r + '，L=' + l + '），短的一行按休止补齐',
@@ -475,6 +484,7 @@ const I18N = {
     pdfHeader:  n => '# 从 PDF 识别：' + n + '（请核对节奏与左右手）',
     pdfPage:    p => '# 第 ' + p + ' 页',
     pdfMeasures: ns => '# 小节 ' + ns.join(' · '),
+    tempoMarker: bpm => '♩ = ' + bpm + ' BPM',
     ariaPan:    '手碟布局图',
     ariaSlap:   'Slap（碟面拍击）',
     ariaT:      '肩音 T',
@@ -882,10 +892,11 @@ function playEventNow(hits){
 }
 
 /* ============================ Score parsing =========================== */
-/* events: [{hits:[{key,hand}]}]  — each event = one eighth note.
- * blocks: display structure — {label} or {cols:[...], single:bool}
+/* events: [{hits:[{key,hand}], scoreBpm:number|null}] — each event = one eighth note.
+ * blocks: display structure — {label}, {tempo}, or {cols:[...], single:bool}
  * col: {bar:true} or {evIdx, rT, lT}                                     */
-let events = [], blocks = [], parseWarnings = [];
+let events = [], blocks = [], parseWarnings = [], tempoChanges = [];
+let scoreHasTempo = false;
 
 function tokenize(s){
   // Normalize glued tokens: ".|" -> ". |", "T." -> "T .", "1+4." -> "1+4 ."
@@ -931,12 +942,21 @@ function buildBlock(rToks, lToks, legacy){
 }
 
 function parseScore(text){
-  events = []; blocks = []; parseWarnings = [];
+  events = []; blocks = []; parseWarnings = []; tempoChanges = [];
   const lines = text.split('\n').map(l => l.trim());
   let i = 0;
   while (i < lines.length){
     const line = lines[i];
     if (!line){ i++; continue; }
+    const mBpm = line.match(/^@BPM\s*[:=]?\s*(\d{1,3})$/i);
+    if (mBpm){
+      const bpm = Number(mBpm[1]);
+      if (bpm >= 20 && bpm <= 300){
+        tempoChanges.push({evIdx: events.length, bpm});
+        blocks.push({tempo: bpm});
+      }
+      i++; continue;
+    }
     if (line.startsWith('#')){
       blocks.push({label: line.replace(/^#\s*/, '')});
       i++; continue;
@@ -955,6 +975,14 @@ function parseScore(text){
       blocks.push(buildBlock(tokenize(line), null, true)); i++;   // legacy single line
     }
   }
+  let activeBpm = null, tempoIdx = 0;
+  for (let evIdx = 0; evIdx < events.length; evIdx++){
+    while (tempoIdx < tempoChanges.length && tempoChanges[tempoIdx].evIdx <= evIdx)
+      activeBpm = tempoChanges[tempoIdx++].bpm;
+    events[evIdx].scoreBpm = activeBpm;
+  }
+  scoreHasTempo = tempoChanges.length > 0;
+  configureBpmControl(scoreHasTempo);
   renderTrack();
 }
 
@@ -964,6 +992,12 @@ const trackView = document.getElementById('trackView');
 function renderTrack(){
   trackView.innerHTML = '';
   for (const b of blocks){
+    if (b.tempo !== undefined){
+      const s = document.createElement('span');
+      s.className = 'vlabel'; s.textContent = tr('tempoMarker', b.tempo);
+      trackView.appendChild(s);
+      continue;
+    }
     if (b.label !== undefined){
       const s = document.createElement('span');
       s.className = 'vlabel'; s.textContent = b.label;
@@ -1114,6 +1148,7 @@ let playing = false, pos = 0, nextTime = 0, timer = null;
 let visQueue = [];
 let stopAtTime = Infinity;
 let eighthCount = 0;
+let visualTempoBpm = null;
 
 const bpmSlider  = document.getElementById('bpm');
 const volSlider  = document.getElementById('vol');
@@ -1121,17 +1156,48 @@ const chkLoop    = document.getElementById('chkLoop');
 const chkMetro   = document.getElementById('chkMetro');
 const btnPlay    = document.getElementById('btnPlay');
 const statusEl   = document.getElementById('status');
+const bpmLabelEl = document.getElementById('bpmLabel');
+const bpmValEl   = document.getElementById('bpmVal');
+let bpmControlDynamic = false;
+let plainBpm = Number(bpmSlider.value), tempoScale = 100;
 
-function eighthDur(){ return 30 / Number(bpmSlider.value); }   // 60/bpm/2
+function configureBpmControl(dynamic){
+  if (dynamic !== bpmControlDynamic){
+    if (bpmControlDynamic) tempoScale = Number(bpmSlider.value);
+    else plainBpm = Number(bpmSlider.value);
+    bpmControlDynamic = dynamic;
+    bpmSlider.min = dynamic ? '50' : '50';
+    bpmSlider.max = dynamic ? '150' : '200';
+    bpmSlider.step = dynamic ? '5' : '1';
+    bpmSlider.value = dynamic ? String(tempoScale) : String(plainBpm);
+  }
+  bpmLabelEl.dataset.i18n = dynamic ? 'tempoScaleLabel' : 'bpmLabel';
+  bpmLabelEl.textContent = tr(bpmLabelEl.dataset.i18n);
+  bpmValEl.textContent = bpmSlider.value + (dynamic ? '%' : '');
+}
+
+function tempoAt(evIdx){
+  if (!bpmControlDynamic) return {written: null, actual: Number(bpmSlider.value)};
+  const ev = events[Math.max(0, Math.min(evIdx, events.length - 1))];
+  const written = (ev && ev.scoreBpm) || (tempoChanges[0] && tempoChanges[0].bpm) || 110;
+  return {written, actual: written * Number(bpmSlider.value) / 100};
+}
+function eighthDur(evIdx){ return 30 / tempoAt(evIdx).actual; }   // 60/bpm/2
+function showPlayingTempo(evIdx){
+  const t = tempoAt(evIdx);
+  if (t.written) setStatus('playingAtScore', Math.round(t.actual), t.written, bpmSlider.value);
+  else setStatus('playingAt', Math.round(t.actual));
+}
 
 function scheduler(){
   while (playing && pos < events.length && nextTime < actx.currentTime + LOOKAHEAD_S){
     const ev = events[pos];
+    const tempo = tempoAt(pos);
     for (const h of ev.hits) playHit(h.key, nextTime, 0.85);
     if (chkMetro.checked && eighthCount % 2 === 0)
       playTick(nextTime, eighthCount % 8 === 0);
-    visQueue.push({time: nextTime, evIdx: pos});
-    nextTime += eighthDur();
+    visQueue.push({time: nextTime, evIdx: pos, tempo});
+    nextTime += eighthDur(pos);
     eighthCount++;
     pos++;
     if (pos >= events.length){
@@ -1149,6 +1215,10 @@ function visLoop(){
     const v = visQueue.shift();
     for (const h of events[v.evIdx].hits) flashPad(h.key, h.hand);
     highlightToken(v.evIdx);
+    if (v.tempo.written !== visualTempoBpm){
+      visualTempoBpm = v.tempo.written;
+      showPlayingTempo(v.evIdx);
+    }
   }
   requestAnimationFrame(visLoop);
 }
@@ -1163,10 +1233,11 @@ function startFrom(evIdx){
   nextTime = actx.currentTime + 0.08;
   stopAtTime = Infinity;
   visQueue = [];
+  visualTempoBpm = tempoAt(pos).written;
   timer = setInterval(scheduler, TIMER_MS);
   requestAnimationFrame(visLoop);
   btnPlay.textContent = tr('pause');
-  setStatus('playingAt', bpmSlider.value);
+  showPlayingTempo(pos);
   updateStandaloneMetro();     // playback's scheduler owns the ticking now
 }
 
@@ -1189,7 +1260,7 @@ let metroTimer = null, metroNextTime = 0, metroBeat = 0;
 function metroScheduler(){
   while (metroNextTime < actx.currentTime + LOOKAHEAD_S){
     playTick(metroNextTime, metroBeat % 4 === 0);
-    metroNextTime += 60 / Number(bpmSlider.value);   // live BPM each beat
+    metroNextTime += 60 / tempoAt(pos).actual;   // live BPM/score scale each beat
     metroBeat++;
   }
 }
@@ -1212,8 +1283,10 @@ chkMetro.addEventListener('change', updateStandaloneMetro);
 btnPlay.addEventListener('click', () => { playing ? stopPlay() : startFrom(pos); });
 
 bpmSlider.addEventListener('input', () => {
-  document.getElementById('bpmVal').textContent = bpmSlider.value;
-  if (playing) setStatus('playingAt', bpmSlider.value);
+  if (bpmControlDynamic) tempoScale = Number(bpmSlider.value);
+  else plainBpm = Number(bpmSlider.value);
+  bpmValEl.textContent = bpmSlider.value + (bpmControlDynamic ? '%' : '');
+  if (playing) showPlayingTempo(pos);
 });
 volSlider.addEventListener('input', () => {
   document.getElementById('volVal').textContent = volSlider.value + '%';
@@ -1317,9 +1390,13 @@ function sparseFallback(top, bottom, all){
  * that assumes a system is followed by more content, which isn't true for the
  * very last system of the whole piece. Returns {lines, step} — step is the
  * one actually used, for the caller to carry forward as the next fallback. */
-function systemToLines(top, bottom, fallbackStep, isLastSystem){
+function systemToLines(top, bottom, fallbackStep, isLastSystem, tempos = []){
   const all = [...(top ? top.items : []), ...(bottom ? bottom.items : [])];
-  if (all.length < 2) return {lines: sparseFallback(top, bottom, all), step: null};
+  if (all.length < 2){
+    const lines = sparseFallback(top, bottom, all);
+    if (tempos.length) lines.unshift('@BPM ' + tempos.slice().sort((a, b) => a.x - b.x)[0].bpm);
+    return {lines, step: null};
+  }
   const COL_TOL = 6;
   const sortedX = all.map(it => it.x).sort((a, b) => a - b);
   const cols = [];
@@ -1328,7 +1405,11 @@ function systemToLines(top, bottom, fallbackStep, isLastSystem){
     if (c && x - c.x < COL_TOL) c.x = (c.x * c.n + x) / ++c.n;
     else cols.push({x, n: 1});
   }
-  if (cols.length < 2) return {lines: sparseFallback(top, bottom, all), step: null};
+  if (cols.length < 2){
+    const lines = sparseFallback(top, bottom, all);
+    if (tempos.length) lines.unshift('@BPM ' + tempos.slice().sort((a, b) => a.x - b.x)[0].bpm);
+    return {lines, step: null};
+  }
   const gaps = [];
   for (let i = 1; i < cols.length; i++) gaps.push(cols[i].x - cols[i-1].x);
   let step, usedFallback = false;
@@ -1361,17 +1442,39 @@ function systemToLines(top, bottom, fallbackStep, isLastSystem){
     if (lo > 0 && Math.abs(cols[lo - 1].x - x) < Math.abs(cols[lo].x - x)) lo--;
     return colSlot[lo];
   };
-  const toRow = row => {
+  const toSlots = row => {
     const arr = Array(nSlots).fill('.');
     if (row) for (const it of row.items){
       const s = slotOf(it.x);
       arr[s] = (arr[s] === '.') ? it.str : arr[s] + '+' + it.str;
     }
-    // barline every 8 slots for readability (assumes 4/4, cosmetic only)
-    return arr.flatMap((t, i) => (i > 0 && i % 8 === 0) ? ['|', t] : [t]).join(' ');
+    return arr;
   };
-  const lines = (top && bottom) ? ['R: ' + toRow(top), 'L: ' + toRow(bottom)]
-                                 : [toRow(top || bottom)];
+  const topSlots = toSlots(top), bottomSlots = bottom ? toSlots(bottom) : null;
+  const tempoSlotOf = x => {
+    let i = cols.findIndex(c => c.x >= x - COL_TOL);
+    if (i < 0) i = cols.length - 1;
+    return Math.max(0, Math.min(nSlots - 1, colSlot[i]));
+  };
+  const tempoBySlot = new Map();
+  for (const mark of tempos.slice().sort((a, b) => a.x - b.x))
+    tempoBySlot.set(tempoSlotOf(mark.x), mark.bpm);
+  const starts = [0, ...[...tempoBySlot.keys()].filter(s => s > 0).sort((a, b) => a - b)];
+  const formatRange = (arr, start, end) => arr.slice(start, end)
+    // barline every 8 global slots for readability (assumes 4/4, cosmetic only)
+    .flatMap((t, offset) => (start + offset > start && (start + offset) % 8 === 0) ? ['|', t] : [t])
+    .join(' ');
+  const lines = [];
+  for (let i = 0; i < starts.length; i++){
+    const start = starts[i], end = starts[i + 1] ?? nSlots;
+    if (tempoBySlot.has(start)) lines.push('@BPM ' + tempoBySlot.get(start));
+    if (top && bottom){
+      lines.push('R: ' + formatRange(topSlots, start, end));
+      lines.push('L: ' + formatRange(bottomSlots, start, end));
+    } else {
+      lines.push(formatRange(topSlots, start, end));
+    }
+  }
   return {lines, step: usedFallback ? null : step};
 }
 
@@ -1424,6 +1527,42 @@ function measuresForSystem(top, bottom, numberRows, realRows){
   return best ? best.items.slice().sort((a, b) => a.x - b.x).map(it => it.str) : [];
 }
 
+// Tempo marks are stored as an '=' glyph followed by a 2-3 digit number.
+// Pair them by baseline and horizontal proximity before associating them
+// with the nearest score system below.
+function extractTempoMarks(rawItems){
+  const marks = [];
+  for (const it of rawItems){
+    const combined = it.str.match(/^=\s*(\d{2,3})$/);
+    if (combined){
+      const bpm = Number(combined[1]);
+      if (bpm >= 20 && bpm <= 300) marks.push({x: it.x, y: it.y, bpm});
+      continue;
+    }
+    if (it.str !== '=') continue;
+    let best = null, bestGap = Infinity;
+    for (const n of rawItems){
+      if (!/^\d{2,3}$/.test(n.str) || Math.abs(n.y - it.y) > ROW_Y_TOL) continue;
+      const gap = n.x - it.x;
+      if (gap > 0 && gap < 40 && gap < bestGap){ best = n; bestGap = gap; }
+    }
+    if (best){
+      const bpm = Number(best.str);
+      if (bpm >= 20 && bpm <= 300) marks.push({x: it.x, y: it.y, bpm});
+    }
+  }
+  return marks;
+}
+
+function temposForSystem(top, bottom, marks){
+  const items = [...top.items, ...(bottom ? bottom.items : [])];
+  const minX = Math.min(...items.map(i => i.x)), maxX = Math.max(...items.map(i => i.x));
+  return marks.filter(mark => {
+    const gap = top.y - mark.y;
+    return gap >= 8 && gap <= 60 && mark.x >= minX - 30 && mark.x <= maxX + 30;
+  });
+}
+
 async function recognizePdf(file){
   const lib = await loadPdfJs();
   const doc = await lib.getDocument({data: await file.arrayBuffer()}).promise;
@@ -1443,6 +1582,7 @@ async function recognizePdf(file){
       .filter(it => it.str);
     const items = rawItems.filter(it => TOKEN_RE.test(it.str));
     const numberRows = clusterRows(rawItems.filter(it => MEASURE_RE.test(it.str)));
+    const tempoMarks = extractTempoMarks(rawItems);
     const rows = clusterRows(items);
     // A row below MIN_ROW_TOKENS is normally junk (page-number stamps, the pad-diagram
     // labels scattered around the cover page's circle) — but a short *real* final
@@ -1455,14 +1595,16 @@ async function recognizePdf(file){
       (isFinite(noteMinX) && r.items.every(it => it.x >= noteMinX)));
     for (const {top, bottom} of groupSystems(realRows))
       allSystems.push({page: p, top, bottom,
-        measures: measuresForSystem(top, bottom, numberRows, realRows)});
+        measures: measuresForSystem(top, bottom, numberRows, realRows),
+        tempos: temposForSystem(top, bottom, tempoMarks)});
   }
   if (!allSystems.length)
     throw new Error(tr('pdfNoScore'));
   const out = [tr('pdfHeader', file.name)];
   let pageMarked = null, fallbackStep = null;
-  allSystems.forEach(({page, top, bottom, measures}, idx) => {
-    const {lines, step} = systemToLines(top, bottom, fallbackStep, idx === allSystems.length - 1);
+  allSystems.forEach(({page, top, bottom, measures, tempos}, idx) => {
+    const {lines, step} = systemToLines(
+      top, bottom, fallbackStep, idx === allSystems.length - 1, tempos);
     if (step) fallbackStep = step;
     if (lines.length){
       if (pageMarked !== page){ out.push(tr('pdfPage', page)); pageMarked = page; }

@@ -1,7 +1,7 @@
 // Minimal offline cache for the handpan app itself. Bump CACHE_NAME whenever
 // the cached files change so clients pick up the new version instead of
 // being stuck on a stale copy forever.
-const CACHE_NAME = 'handpan-v30';
+const CACHE_NAME = 'handpan-v31';
 const PRECACHE = [
   './index.html',
   './handpan-player.html',

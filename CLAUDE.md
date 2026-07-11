@@ -43,11 +43,13 @@ Everything is in one `<script>` block in `handpan-player.html`, organized top-to
    - Two-row notation: an `R:` line (right hand) paired with the following `L:` line (left hand),
      column-aligned; one column = one eighth note. A lone line with no `R:`/`L:` prefix is treated
      as legacy single-hand notation.
-   - Tokens: `D` Ding, `1`-`8` tone fields, `T` shoulder, `S` slap, `.` rest, `|` barline (display
+   - Tokens: `D` Ding, `1`-`11` tone fields, `T` shoulder, `S` slap, `.` rest, `|` barline (display
      only, doesn't advance time), `#` comment/section label line. `+` joins simultaneous notes in
-     one column (e.g. `1+4`); a hand-hit combines with the row's hand unless `legacy`, in which
-     case hand is `null` (played as neutral/right-colored).
-   - Parsing produces two parallel structures: `events` (flat list of `{hits:[{key,hand}]}`, one
+     one column (e.g. `1+4`). `@BPM 95` is a zero-time tempo directive applied to following events;
+     a hand-hit combines with the row's hand unless `legacy`, in which case hand is `null` (played
+     as neutral/right-colored).
+   - Parsing produces two parallel structures: `events` (flat list of
+     `{hits:[{key,hand}],scoreBpm}`, one
      per eighth note — this is what the scheduler plays) and `blocks` (display structure with
      labels/columns/barlines — this is what `renderTrack` draws in `#trackView`). Keep these in
      sync if you change parsing: `evIdx` in a block column must index into `events`.
@@ -59,13 +61,17 @@ Everything is in one `<script>` block in `handpan-player.html`, organized top-to
    ahead using `actx.currentTime`; `visLoop()` runs on `requestAnimationFrame` and fires the
    visual flash/highlight for events whose scheduled time has arrived. Audio timing must always
    come from `actx.currentTime`, not `setTimeout`/`setInterval` timestamps, to stay sample-accurate.
+   Scores with `@BPM` use each event's `scoreBpm` multiplied by the 50%-150% tempo-scale slider;
+   scores without directives retain the absolute 50-200 BPM slider.
 
 6. **PDF recognition (`recognizePdf`)** — pure-geometry, no ML/OCR. Reads the PDF's text layer via
    pdf.js, keeps single-char glyphs matching note tokens, clusters them into rows by y-coordinate
    (`clusterRows`), pairs adjacent rows into an R/L "system" (`systemToLines`), and quantizes x
    onto an eighth-note grid to reconstruct `R:`/`L:` score lines. Sparse numeric rows immediately
    above a system are preserved as `# Measures 1 · 2` / `# 小节 1 · 2` labels, so measure progress
-   remains visible in follow mode. Only works on vector PDFs with a real text layer (e.g.
+   remains visible in follow mode. `= 95` tempo glyph pairs are mapped by x-position to score
+   slots and emitted as `@BPM 95`, including multiple tempo changes within one visual system.
+   Only works on vector PDFs with a real text layer (e.g.
    Notepan-exported scores) — scanned/rasterized PDFs have no text layer and will report zero
    systems found.
 

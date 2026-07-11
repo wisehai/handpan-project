@@ -154,15 +154,74 @@ await check('follow controls: numeric sensitivity + D/T and chord progress match
   await page.evaluate(() => setLang('en'));
 });
 
+await check('score tempo directives drive per-event BPM and scale UI', async () => {
+  const originalScore = await page.locator('#scoreText').inputValue();
+  try {
+    const state = await page.evaluate(() => {
+      scoreText.value = '@BPM 120\nR: D . D .\nL: . 1 . 1\n\n@BPM 60\nR: D .\nL: . 1';
+      applyScore();
+      bpmSlider.value = '50';
+      bpmSlider.dispatchEvent(new Event('input', {bubbles:true}));
+      const savedPlayHit = playHit;
+      let scheduledIntervals = [];
+      try {
+        playHit = () => {};
+        chkMetro.checked = false;
+        ensureCtx();
+        playing = true; pos = 0;
+        nextTime = actx.currentTime - 3;
+        stopAtTime = Infinity; visQueue = [];
+        scheduler();
+        scheduledIntervals = visQueue.slice(1).map((v, i) =>
+          Number((v.time - visQueue[i].time).toFixed(3)));
+      } finally {
+        playHit = savedPlayHit;
+        stopPlay(true);
+      }
+      return {
+        eventBpms: events.map(e => e.scoreBpm),
+        changes: tempoChanges,
+        dynamic: bpmControlDynamic,
+        label: bpmLabelEl.textContent,
+        output: bpmValEl.textContent,
+        max: bpmSlider.max,
+        firstActual: tempoAt(0).actual,
+        laterActual: tempoAt(4).actual,
+        firstDur: eighthDur(0),
+        laterDur: eighthDur(4),
+        scheduledIntervals,
+        markers: [...document.querySelectorAll('#trackView .vlabel')].map(el => el.textContent),
+      };
+    });
+    if (state.eventBpms.join(',') !== '120,120,120,120,60,60')
+      throw new Error(`wrong event BPM map: ${state.eventBpms}`);
+    if (!state.dynamic || state.label !== 'Tempo scale' || state.output !== '50%' || state.max !== '150')
+      throw new Error(`scale UI not configured: ${JSON.stringify(state)}`);
+    if (state.firstActual !== 60 || state.laterActual !== 30 ||
+        state.firstDur !== 0.5 || state.laterDur !== 1)
+      throw new Error(`scaled tempo math is wrong: ${JSON.stringify(state)}`);
+    if (state.scheduledIntervals.join(',') !== '0.5,0.5,0.5,0.5,1')
+      throw new Error(`scheduler ignored tempo transition: ${state.scheduledIntervals}`);
+    if (!state.markers.includes('♩ = 120 BPM') || !state.markers.includes('♩ = 60 BPM'))
+      throw new Error(`tempo markers not rendered: ${state.markers}`);
+  } finally {
+    await page.evaluate(score => { scoreText.value = score; applyScore(); }, originalScore);
+  }
+  const restored = await page.evaluate(() => ({dynamic:bpmControlDynamic, label:bpmLabelEl.textContent}));
+  if (restored.dynamic || restored.label !== 'Tempo BPM')
+    throw new Error(`plain BPM UI was not restored: ${JSON.stringify(restored)}`);
+});
+
 await check('PDF recognition preserves measure-number progress labels', async () => {
   const originalScore = await page.locator('#scoreText').inputValue();
   try {
-    await page.evaluate(() => setLang('zh'));
-    for (const name of [
-      'Notepan - Pocket Groove 11.pdf',
-      'Pocket Groove 10.pdf',
-      'Sam Maher - New York.pdf',
-    ]){
+    await page.evaluate(() => { tempoScale = 100; setLang('zh'); });
+    const pdfs = [
+      ['Notepan - Pocket Groove 11.pdf', [110]],
+      ['Pocket Groove 10.pdf', [118]],
+      ['Sam Maher - New York.pdf', [95, 85, 45, 123, 50]],
+    ];
+    for (const [name, expectedBpms] of pdfs){
       await page.evaluate(() => { lastStatus = null; });
       await page.setInputFiles('#pdfFile', join(ROOT, 'test', '测试谱子', name));
       await page.waitForFunction(
@@ -174,6 +233,18 @@ await check('PDF recognition preserves measure-number progress labels', async ()
         throw new Error(`${name}: unexpected first label ${JSON.stringify(labels[0])}`);
       if (labels.length < 4)
         throw new Error(`${name}: expected several measure labels, found ${labels.length}`);
+      const bpms = [...new Set(
+        result.split('\n').filter(line => /^@BPM \d+$/.test(line)).map(line => Number(line.slice(5))))];
+      for (const bpm of expectedBpms)
+        if (!bpms.includes(bpm)) throw new Error(`${name}: BPM ${bpm} not recognized (${bpms})`);
+      const tempoUi = await page.evaluate(() => ({dynamic:bpmControlDynamic, value:bpmValEl.textContent}));
+      if (!tempoUi.dynamic || tempoUi.value !== '100%')
+        throw new Error(`${name}: imported tempo did not activate 100% scale mode`);
+      if (name.startsWith('Sam Maher')){
+        const early = await page.evaluate(() => tempoChanges.filter(t => t.bpm === 85 || t.bpm === 45));
+        if (early.length < 2 || early[0].evIdx >= early[1].evIdx)
+          throw new Error(`${name}: mid-system tempo changes were not ordered (${JSON.stringify(early)})`);
+      }
     }
   } finally {
     await page.evaluate(score => {

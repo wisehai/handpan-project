@@ -233,6 +233,8 @@
     background:var(--panel);border-bottom:1px solid var(--line);}
   #followBar button{padding:5px 12px;border-radius:999px;font-size:12px;}
   #sensWrap input[type=range]{width:76px;}
+  #sensValue{display:inline-block;min-width:2.2em;text-align:right;
+    font-variant-numeric:tabular-nums;color:var(--brass);}
   #micMeter{flex:0 0 52px;height:6px;border:1px solid var(--line);border-radius:3px;
     overflow:hidden;background:#0a0e12;}
   #micMeter i{display:block;height:100%;width:0;background:var(--brass);
@@ -259,7 +261,8 @@
   <button id="btnFollowExit" data-i18n="exitFollow">✕ Exit</button>
   <label class="chk"><input type="checkbox" id="chkLenient"><span data-i18n="lenient">Any-hit mode</span></label>
   <label class="chk" id="sensWrap"><span data-i18n="sens">Sensitivity</span>
-    <input type="range" id="sensSlider" min="0.4" max="2.5" step="0.1" value="1"></label>
+    <input type="range" id="sensSlider" min="0.4" max="2.5" step="0.1" value="1">
+    <output id="sensValue" for="sensSlider">1.0</output></label>
   <span id="micMeter" title="mic level"><i></i></span>
   <span id="followState"></span>
 </div>
@@ -417,7 +420,7 @@ const I18N = {
     lenient:    'Any-hit mode',
     sens:       'Sensitivity',
     followListening: 'Listening…',
-    followHeard: k => 'Heard: ' + k,
+    followHeard: (first, second) => 'Heard: ' + first + (second ? ' (next: ' + second + ')' : ''),
     followMicDenied: 'Microphone permission denied — follow mode unavailable',
     followNoMic: 'Microphone unavailable here (needs HTTPS or the installed app)',
   },
@@ -482,7 +485,7 @@ const I18N = {
     lenient:    '宽松模式',
     sens:       '灵敏度',
     followListening: '听音中…',
-    followHeard: k => '识别到 ' + k,
+    followHeard: (first, second) => '识别到 ' + first + (second ? '（次选 ' + second + '）' : ''),
     followMicDenied: '麦克风权限被拒绝，无法使用跟弹模式',
     followNoMic: '当前环境不支持麦克风（需要 HTTPS 或安装版应用）',
   },
@@ -1059,6 +1062,7 @@ function scheduleRowBands(){
   cancelAnimationFrame(rowBandsRaf);
   rowBandsRaf = requestAnimationFrame(() => {
     computeRowBands();          // rebuilds #trackBands, losing any .now-row
+    lastFollowRow = null;       // layout changed; allow one fresh centering pass
     const cur = trackView.querySelector('.col.now');
     if (cur && cur.dataset.row !== undefined){
       const band = document.querySelector('#trackBands .rowband[data-row="' + cur.dataset.row + '"]');
@@ -1071,9 +1075,11 @@ window.addEventListener('orientationchange', scheduleRowBands);
 document.addEventListener('fullscreenchange', scheduleRowBands);
 
 function highlightToken(evIdx){
-  trackView.querySelectorAll('.col.now').forEach(n => n.classList.remove('now'));
+  const previous = trackView.querySelector('.col.now');
+  if (previous) previous.classList.remove('now');
   const bands = document.getElementById('trackBands');
-  if (bands) bands.querySelectorAll('.rowband.now-row').forEach(n => n.classList.remove('now-row'));
+  const previousBand = bands && bands.querySelector('.rowband.now-row');
+  if (previousBand) previousBand.classList.remove('now-row');
   const s = trackView.querySelector('.col[data-event="' + evIdx + '"]');
   if (s){
     s.classList.add('now');
@@ -1086,11 +1092,15 @@ function highlightToken(evIdx){
     // scroll on mobile (page keeps snapping back to the score on every tick).
     const r = s.getBoundingClientRect(), box = trackView.getBoundingClientRect();
     if (document.body.classList.contains('follow')){
-      // Follow mode: keep the active line vertically centered for lookahead.
-      // Delta is ~0 while the cursor stays within the same physical row, so
-      // this only produces a visible scroll when the row actually changes.
-      const delta = (r.top + r.height / 2) - (box.top + box.height / 2);
-      trackView.scrollBy({top: delta, behavior: 'smooth'});
+      // Smooth scrolling competes with the rAF-driven mic detector on the
+      // browser's main thread. Center only when the physical row changes;
+      // advancing within one row then costs no layout animation at all.
+      const row = s.dataset.row;
+      if (row !== lastFollowRow){
+        const delta = (r.top + r.height / 2) - (box.top + box.height / 2);
+        trackView.scrollBy({top: delta, behavior: 'smooth'});
+        lastFollowRow = row;
+      }
     } else if (r.top < box.top) trackView.scrollBy({top: r.top - box.top, behavior: 'smooth'});
     else if (r.bottom > box.bottom) trackView.scrollBy({top: r.bottom - box.bottom, behavior: 'smooth'});
   }
@@ -1670,16 +1680,23 @@ let followTpls = null, followBinHz = 0;
 let fluxEma = 0, lastOnsetAt = 0;
 let detCur = null, detPrev = null, detReady = false, detWeight = null, detLo = 0, detHi = 0;
 let snapRing = null, snapIdx = 0, preSpec = null, postSpec = null, deltaSpec = null;
-let meterFrame = 0, wakeLock = null;
+let meterFrame = 0, wakeLock = null, lastFollowRow = null;
 const sensSlider = document.getElementById('sensSlider');
+const sensValue = document.getElementById('sensValue');
 const micMeterFill = document.querySelector('#micMeter i');
 {
   const saved = store() && store().getItem('handpan_sens');
   if (saved && sensSlider) sensSlider.value = saved;
 }
-if (sensSlider) sensSlider.addEventListener('input', () => {
+function updateSensitivity(){
+  if (!sensSlider) return;
+  if (sensValue) sensValue.value = Number(sensSlider.value).toFixed(1);
   const s = store(); if (s) s.setItem('handpan_sens', sensSlider.value);
-});
+}
+if (sensSlider){
+  updateSensitivity();
+  sensSlider.addEventListener('input', updateSensitivity);
+}
 
 /* Spectral templates from the measured note tables: bin positions of the
  * fundamental and partials, fundamental overweighted so octave-sharing
@@ -1763,6 +1780,17 @@ function followMiss(idx){
   col.addEventListener('animationend', () => col.classList.remove('miss'), {once: true});
 }
 
+// D and the shoulder T share nearly all strong modes on a real pan. Keep the
+// classifier's honest ranking in the status bar, but accept either for score
+// progress so this physical ambiguity cannot pin the cursor in place.
+function followKeysMatch(expected, heard){
+  return expected === heard ||
+    ((expected === 'D' || expected === 'T') && (heard === 'D' || heard === 'T'));
+}
+function followExpectedMatches(hits, heardKeys){
+  return hits.some(h => heardKeys.some(heard => followKeysMatch(h.key, heard)));
+}
+
 // Advance the cursor past playable column idx and highlight the next target.
 function followAdvance(idx){
   for (const h of events[idx].hits) flashPad(h.key, h.hand);
@@ -1789,12 +1817,11 @@ function handleFollowOnset(){
   }
   const scores = classifyFollowSpectrum(deltaSpec);
   if (!scores.length) return;
-  followState.textContent = tr('followHeard', scores[0].key);
+  followState.textContent = tr('followHeard', scores[0].key, scores[1] && scores[1].key);
   const idx = followTargetIdx();
   if (idx < 0) return;
-  const expected = events[idx].hits.map(h => h.key);
   const top = scores.slice(0, FOLLOW.matchTopN).map(s => s.key);
-  if (chkLenient.checked || expected.some(k => top.includes(k))){
+  if (chkLenient.checked || followExpectedMatches(events[idx].hits, top)){
     followAdvance(idx);
     return;
   }
@@ -1806,7 +1833,7 @@ function handleFollowOnset(){
     followPos = ahead + 1;
     ahead = followTargetIdx();
     if (ahead < 0 || ahead === idx) break;
-    if (events[ahead].hits.some(h => h.key === scores[0].key)){
+    if (followExpectedMatches(events[ahead].hits, [scores[0].key])){
       followAdvance(ahead);
       return;
     }
@@ -1912,6 +1939,7 @@ async function startFollow(){
   detReady = false; fluxEma = 0; lastOnsetAt = 0; meterFrame = 0;
   followOn = true;
   followPos = 0;
+  lastFollowRow = null;
   document.body.classList.add('follow');
   followBar.hidden = false;
   followState.textContent = tr('followListening');
@@ -1931,6 +1959,7 @@ async function startFollow(){
 function stopFollow(){
   if (!followOn) return;
   followOn = false;
+  lastFollowRow = null;
   cancelAnimationFrame(followRaf);
   if (micSource) micSource.disconnect();
   if (micStream) micStream.getTracks().forEach(t => t.stop());

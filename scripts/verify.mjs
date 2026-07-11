@@ -130,6 +130,30 @@ await check('follow-mode classifier: clean notes + new note under sustain', asyn
   if (got.sustain !== '9') throw new Error(`9 struck under 4's sustain heard as ${got.sustain}`);
 });
 
+await check('follow controls: numeric sensitivity + D/T and chord progress matching', async () => {
+  const state = await page.evaluate(() => {
+    sensSlider.value = '1.5';
+    sensSlider.dispatchEvent(new Event('input', { bubbles: true }));
+    setLang('zh');
+    return {
+      shown: sensValue.value,
+      saved: localStorage.getItem('handpan_sens'),
+      candidates: tr('followHeard', 'T', 'D'),
+      dFromT: followExpectedMatches([{key:'D'}], ['T']),
+      tFromD: followExpectedMatches([{key:'T'}], ['D']),
+      chordEither: followExpectedMatches([{key:'4'}, {key:'8'}], ['8']),
+      chordMiss: followExpectedMatches([{key:'4'}, {key:'8'}], ['5']),
+    };
+  });
+  if (state.shown !== '1.5' || state.saved !== '1.5')
+    throw new Error(`sensitivity value not synchronized: ${JSON.stringify(state)}`);
+  if (state.candidates !== '识别到 T（次选 D）')
+    throw new Error(`candidate status missing runner-up: ${state.candidates}`);
+  if (!state.dFromT || !state.tFromD || !state.chordEither || state.chordMiss)
+    throw new Error(`progress matching is wrong: ${JSON.stringify(state)}`);
+  await page.evaluate(() => setLang('en'));
+});
+
 await check('follow mode: fake mic starts, UI collapses, exit restores', async () => {
   const barBefore = await page.evaluate(
     () => getComputedStyle(document.getElementById('followBar')).display);
@@ -224,6 +248,38 @@ await check('follow mode centers the active row; normal mode edge-clamps', async
   if (centered > 40) throw new Error(`active row not centered in follow mode: ${centered}px off-center`);
   await page.click('#btnFollowExit');
   await page.waitForFunction(() => !document.body.classList.contains('follow'));
+});
+
+await check('follow mode scrolls only when the physical row changes', async () => {
+  await page.click('#btnFollow');
+  await page.waitForSelector('body.follow', { timeout: 5000 });
+  try {
+    const calls = await page.evaluate(() => {
+      const view = document.getElementById('trackView');
+      const cols = [...view.querySelectorAll('.col')];
+      const current = view.querySelector('.col.now');
+      const same = cols.find(c => c !== current && c.dataset.row === current.dataset.row);
+      const other = cols.find(c => c.dataset.row !== current.dataset.row);
+      if (!same || !other) throw new Error('score did not produce multiple physical rows');
+      const original = view.scrollBy;
+      let count = 0;
+      view.scrollBy = () => { count++; };
+      lastFollowRow = current.dataset.row;
+      highlightToken(Number(same.dataset.event));
+      const withinRow = count;
+      highlightToken(Number(other.dataset.event));
+      const afterRowChange = count;
+      view.scrollBy = original;
+      return {withinRow, afterRowChange};
+    });
+    if (calls.withinRow !== 0 || calls.afterRowChange !== 1)
+      throw new Error(`unexpected scroll calls: ${JSON.stringify(calls)}`);
+  } finally {
+    if (await page.locator('body.follow').count()){
+      await page.click('#btnFollowExit');
+      await page.waitForFunction(() => !document.body.classList.contains('follow'));
+    }
+  }
 });
 
 await check('transport controls share one row on narrow phones', async () => {

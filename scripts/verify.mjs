@@ -154,6 +154,37 @@ await check('follow controls: numeric sensitivity + D/T and chord progress match
   await page.evaluate(() => setLang('en'));
 });
 
+await check('PDF recognition preserves measure-number progress labels', async () => {
+  const originalScore = await page.locator('#scoreText').inputValue();
+  try {
+    await page.evaluate(() => setLang('zh'));
+    for (const name of [
+      'Notepan - Pocket Groove 11.pdf',
+      'Pocket Groove 10.pdf',
+      'Sam Maher - New York.pdf',
+    ]){
+      await page.evaluate(() => { lastStatus = null; });
+      await page.setInputFiles('#pdfFile', join(ROOT, 'test', '测试谱子', name));
+      await page.waitForFunction(
+        () => lastStatus && lastStatus.msgKey === 'pdfDone', null, { timeout: 30000 });
+      const result = await page.locator('#scoreText').inputValue();
+      const labels = result.split('\n').filter(line => line.startsWith('# 小节 '));
+      if (!labels.length) throw new Error(`${name}: no measure labels recognized`);
+      if (labels[0] !== '# 小节 1 · 2')
+        throw new Error(`${name}: unexpected first label ${JSON.stringify(labels[0])}`);
+      if (labels.length < 4)
+        throw new Error(`${name}: expected several measure labels, found ${labels.length}`);
+    }
+  } finally {
+    await page.evaluate(score => {
+      scoreText.value = score;
+      applyScore();
+      dirty = false;
+      setLang('en');
+    }, originalScore);
+  }
+});
+
 await check('follow mode: fake mic starts, UI collapses, exit restores', async () => {
   const barBefore = await page.evaluate(
     () => getComputedStyle(document.getElementById('followBar')).display);

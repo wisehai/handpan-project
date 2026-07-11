@@ -63,9 +63,11 @@ Everything is in one `<script>` block in `handpan-player.html`, organized top-to
 6. **PDF recognition (`recognizePdf`)** — pure-geometry, no ML/OCR. Reads the PDF's text layer via
    pdf.js, keeps single-char glyphs matching note tokens, clusters them into rows by y-coordinate
    (`clusterRows`), pairs adjacent rows into an R/L "system" (`systemToLines`), and quantizes x
-   onto an eighth-note grid to reconstruct `R:`/`L:` score lines. Only works on vector PDFs with a
-   real text layer (e.g. Notepan-exported scores) — scanned/rasterized PDFs have no text layer and
-   will report zero systems found.
+   onto an eighth-note grid to reconstruct `R:`/`L:` score lines. Sparse numeric rows immediately
+   above a system are preserved as `# Measures 1 · 2` / `# 小节 1 · 2` labels, so measure progress
+   remains visible in follow mode. Only works on vector PDFs with a real text layer (e.g.
+   Notepan-exported scores) — scanned/rasterized PDFs have no text layer and will report zero
+   systems found.
 
 7. **Follow mode (跟弹)** — mic-driven score following: `startFollow` opens `getUserMedia` (raw,
    no AGC/echo-cancel) into two parallel `AnalyserNode`s — a short-window detector (2048) where

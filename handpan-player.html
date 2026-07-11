@@ -408,6 +408,7 @@ const I18N = {
     pdfNoScore: 'No score tokens found in the PDF text layer — scanned or graphics-only scores need OCR / a vision model',
     pdfHeader:  n => '# Recognized from PDF: ' + n + ' (verify rhythm & hands)',
     pdfPage:    p => '# Page ' + p,
+    pdfMeasures: ns => '# Measures ' + ns.join(' · '),
     ariaPan:    'Handpan layout',
     ariaSlap:   'Slap (shell)',
     ariaT:      'Shoulder tone T',
@@ -473,6 +474,7 @@ const I18N = {
     pdfNoScore: '未在 PDF 文本层找到乐谱记号——扫描件或纯图形谱需要 OCR/视觉模型',
     pdfHeader:  n => '# 从 PDF 识别：' + n + '（请核对节奏与左右手）',
     pdfPage:    p => '# 第 ' + p + ' 页',
+    pdfMeasures: ns => '# 小节 ' + ns.join(' · '),
     ariaPan:    '手碟布局图',
     ariaSlap:   'Slap（碟面拍击）',
     ariaT:      '肩音 T',
@@ -1249,8 +1251,8 @@ document.getElementById('btnApply').addEventListener('click', () => applyScore()
  * (D / T / S / 1-8) is a glyph with (x, y) coordinates. Recognition is
  * pure geometry — no ML involved:
  *   1. keep single-char note tokens, cluster them into rows by y
- *   2. rows with >= MIN_ROW_TOKENS items are score rows; junk (titles,
- *      measure numbers, layout-page labels) falls below the threshold
+ *   2. rows with >= MIN_ROW_TOKENS items are score rows; sparse number rows
+ *      immediately above them are retained as measure labels
  *   3. two adjacent rows = one system: upper row -> R, lower row -> L
  *   4. quantize x onto the 8th-note grid (grid step = smallest x gap);
  *      empty slots become rests
@@ -1258,6 +1260,7 @@ document.getElementById('btnApply').addEventListener('click', () => applyScore()
 const PDFJS_URL    = './vendor/pdfjs/pdf.min.js';
 const PDFJS_WORKER = './vendor/pdfjs/pdf.worker.min.js';
 const TOKEN_RE = /^(D|T|S|1[01]|[1-9])$/i;   // case-insensitive: some glyph variants render lowercase
+const MEASURE_RE = /^\d{1,3}$/;
 // `10`/`11` match only when the PDF stores them as one text item; if split
 // into two glyphs they arrive as `1` + a stray `0`/`1` and can't be told
 // apart from real notes, so we accept that edge case going unrecognized.
@@ -1402,6 +1405,25 @@ function groupSystems(rows){
   });
 }
 
+// Notepan places one or two sparse measure numbers roughly 20-40pt above
+// each two-hand system. Keep only the closest numeric row in that window,
+// excluding y positions already used by real note/chord rows. This also
+// supports measure numbers above 11, which are not valid score tokens.
+function measuresForSystem(top, bottom, numberRows, realRows){
+  const systemItems = [...top.items, ...(bottom ? bottom.items : [])];
+  const minX = Math.min(...systemItems.map(i => i.x));
+  const maxX = Math.max(...systemItems.map(i => i.x));
+  let best = null, bestGap = Infinity;
+  for (const row of numberRows){
+    const gap = top.y - row.y;
+    if (gap < 8 || gap > 55 || row.items.length > 4) continue;
+    if (realRows.some(real => Math.abs(real.y - row.y) <= ROW_Y_TOL)) continue;
+    if (!row.items.every(it => it.x >= minX - 30 && it.x <= maxX + 10)) continue;
+    if (gap < bestGap){ best = row; bestGap = gap; }
+  }
+  return best ? best.items.slice().sort((a, b) => a.x - b.x).map(it => it.str) : [];
+}
+
 async function recognizePdf(file){
   const lib = await loadPdfJs();
   const doc = await lib.getDocument({data: await file.arrayBuffer()}).promise;
@@ -1413,12 +1435,14 @@ async function recognizePdf(file){
     const page = await doc.getPage(p);
     const viewport = page.getViewport({scale: 1});   // accounts for the page's /Rotate entry
     const tc = await page.getTextContent();
-    const items = tc.items
+    const rawItems = tc.items
       .map(it => {
         const tx = lib.Util.transform(viewport.transform, it.transform);
         return {str: it.str.trim().toUpperCase(), x: tx[4], y: tx[5]};
       })
-      .filter(it => TOKEN_RE.test(it.str));
+      .filter(it => it.str);
+    const items = rawItems.filter(it => TOKEN_RE.test(it.str));
+    const numberRows = clusterRows(rawItems.filter(it => MEASURE_RE.test(it.str)));
     const rows = clusterRows(items);
     // A row below MIN_ROW_TOKENS is normally junk (page-number stamps, the pad-diagram
     // labels scattered around the cover page's circle) — but a short *real* final
@@ -1429,17 +1453,20 @@ async function recognizePdf(file){
                                       .flatMap(r => r.items.map(it => it.x)));
     const realRows = rows.filter(r => r.items.length >= MIN_ROW_TOKENS ||
       (isFinite(noteMinX) && r.items.every(it => it.x >= noteMinX)));
-    for (const {top, bottom} of groupSystems(realRows)) allSystems.push({page: p, top, bottom});
+    for (const {top, bottom} of groupSystems(realRows))
+      allSystems.push({page: p, top, bottom,
+        measures: measuresForSystem(top, bottom, numberRows, realRows)});
   }
   if (!allSystems.length)
     throw new Error(tr('pdfNoScore'));
   const out = [tr('pdfHeader', file.name)];
   let pageMarked = null, fallbackStep = null;
-  allSystems.forEach(({page, top, bottom}, idx) => {
+  allSystems.forEach(({page, top, bottom, measures}, idx) => {
     const {lines, step} = systemToLines(top, bottom, fallbackStep, idx === allSystems.length - 1);
     if (step) fallbackStep = step;
     if (lines.length){
       if (pageMarked !== page){ out.push(tr('pdfPage', page)); pageMarked = page; }
+      if (measures.length) out.push(tr('pdfMeasures', measures));
       out.push(...lines, '');
     }
   });

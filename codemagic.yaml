@@ -16,6 +16,11 @@ workflows:
         # SPM-based Capacitor project: build from .xcodeproj, no workspace exists
         XCODE_PROJECT: "ios-app/ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
+        # Marketing version (CFBundleShortVersionString). The regenerated
+        # Capacitor project defaults to 1.0; App Store Connect closes a
+        # version's train once it ships, so bump this after each release
+        # (1.0 is closed — TestFlight rejects new 1.0 builds, code 90186).
+        APP_VERSION: "1.1"
     scripts:
       - name: Copy web app into ios-app/www
         script: |
@@ -52,9 +57,10 @@ workflows:
         script: |
           # See what cap add ios actually produced
           ls -la ios-app/ios/App/
-      - name: Set build number
+      - name: Set version and build number
         script: |
           cd ios-app/ios/App
+          agvtool new-marketing-version $APP_VERSION
           # Use Codemagic's build index as CFBundleVersion (monotonically increasing)
           agvtool new-version -all $PROJECT_BUILD_NUMBER
       - name: Build .ipa

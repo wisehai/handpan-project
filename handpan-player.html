@@ -551,40 +551,81 @@ const NOTES = {
   '11': { name:'E5', freq:659.25, angle: 33, r:95, small:true },
 };
 
-/* ---------- Default score ---------------------------------------------
- * Pocket Groove 11, two-row R/L format. Hands follow the PDF row order
- * (upper row = R, lower row = L), recovered from the user's `X+Y` token
- * order (first = upper). Rows for isolated single notes are inferred
- * from pattern continuity and may need review.                          */
-const DEFAULT_SCORE = `# Pocket Groove 11 (D Kurd 12)  BPM=110
+/* ---------- Built-in etudes -------------------------------------------
+ * Five original etudes (L1-L5), source: test/etudes-L1-L5.md. Hand rule:
+ * odd fields = right hand, even = left; S/D/T default right. Keys are
+ * stable ids (the `b:L1` option values survive language switches); the
+ * dropdown title and the score's leading `#` description follow the UI
+ * language, while the note body is kept once.                           */
+const BUILTINS = {
+  'L1': {
+    title: { zh: 'L1 上行五音', en: 'L1 Rising Five' },
+    desc:  { zh: '上行五音与回落 · 双手交替与音位地图 (L1 · 所有 D Kurd)',
+             en: 'Ascending five & fall-back · alternating hands and the note map (L1 · any D Kurd)' },
+    body:
+`@BPM 60
 
-R: D . 1 . D . 1 . | D . 1 . D . 1 . | D . 1 . D . 1 . | D . 1 . D . 1 .
-L: 4 . . 4 . . 4 . | . 4 . . 4 . . . | 4 . . 4 . . 4 . | . 4 . . 4 . . .
+R: .  5  .  7  .  .  7  .  | .  .  5  .  .  3  D  .  | .  5  .  7  .  .  7  .  | .  .  5  .  .  .  D  .
+L: 4  .  6  .  8  .  .  .  | 6  .  .  .  4  .  .  .  | 4  .  6  .  8  .  .  .  | 6  .  .  .  4  .  .  .
 
-R: D . 2 . D . 2 . | D . 2 . D . 2 . | D . 2 . D . 2 . | D . 2 . D . 2 .
-L: 5 . . 5 . . 5 . | . 5 . . 5 . . . | 5 . . 5 . . 5 . | . 5 . . 5 . . .
+R: .  5  .  7  .  .  7  .  | .  .  5  .  .  3  D  .  | .  5  .  7  .  .  .  .  | .  .  5  .  .  .  D  .
+L: 4  .  6  .  8  .  .  .  | 6  .  .  .  4  .  .  .  | 4  .  6  .  8  .  6  .  | 6  .  .  .  4  .  .  .`,
+  },
+  'L2': {
+    title: { zh: 'L2 反拍鬼音', en: 'L2 Ghost Notes' },
+    desc:  { zh: '反拍鬼音 · 鬼音骨架嵌入 (L2 · 所有 D Kurd)',
+             en: 'Offbeat ghost notes · building on a ghost-note skeleton (L2 · any D Kurd)' },
+    body:
+`@BPM 76
 
-R: D . 1 . D . 1 . | D . 1 . D . 1 . | D . 1 . D . 1 . | D . 1 . D . 1 .
-L: 6 . . 6 . . 6 . | . 6 . . 6 . . . | 6 . . 6 . . 6 . | . 6 . . 6 . . .
+R: 3  .  S  .  5  .  S  .  | 7  .  S  .  5  .  D  .  | 3  .  S  .  5  .  S  .  | 7  .  S  .  5  3  D  .
+L: .  4  .  .  .  6  .  .  | .  8  .  .  .  4  .  .  | .  4  .  .  .  6  .  .  | .  8  .  .  .  .  .  .
 
-R: D . 2 . D . 2 . | D . 2 . D . 2 . | D . 2 . D . 2 . | D . 2 . T . D .
-L: 7 . . 7 . . 7 . | . 7 . . 7 . . . | 7 . . 7 . . 7 . | . 7 . D . . . .
+R: 3  .  S  .  5  .  S  .  | 7  .  S  .  5  .  D  .  | 3  .  S  .  5  .  S  .  | 5  .  3  .  .  .  D  .
+L: .  4  .  .  .  6  .  .  | .  8  .  .  .  4  .  .  | .  4  .  .  .  6  .  .  | .  4  .  2  .  .  .  .`,
+  },
+  'L3': {
+    title: { zh: 'L3 登顶瀑布', en: 'L3 Peak & Falls' },
+    desc:  { zh: '登顶与瀑布 · 句尾跑动与 9 音引入 (L3 · 9 音及以上)',
+             en: 'Summit & waterfall · phrase-end runs, introducing note 9 (L3 · 9+ notes)' },
+    body:
+`@BPM 90
 
+R: .  5  .  7  .  S  9  .  | .  .  7  .  5  .  S  .  | .  5  .  7  .  S  9  .  | .  .  7  .  5  .  D  .
+L: 4  .  6  .  8  .  .  .  | 8  .  .  6  .  4  .  .  | 4  .  6  .  8  .  .  .  | 8  .  .  6  .  4  .  .
 
-R: D . 1 . D . 1 . | D . 1 . D . 1 . | D . 1 . D . 1 . | D . 1 . D . 1 .
-L: 8 . . 7 . . 6 . | 8 . . 7 . . 6 . | 8 . . 7 . . 6 . | 8 . . 7 . . 6 .
+R: .  5  .  7  .  S  9  .  | .  .  7  .  5  .  S  .  | .  5  .  7  .  7  9  .  | 9  .  7  .  5  .  D  .
+L: 4  .  6  .  8  .  .  .  | 8  .  .  6  .  4  .  .  | 4  .  6  .  8  .  .  .  | .  8  .  6  .  4  .  .`,
+  },
+  'L4': {
+    title: { zh: 'L4 顶区旋律', en: 'L4 Top Melody' },
+    desc:  { zh: '顶区旋律与左手固定型 · 双手独立 (L4 · 12 音)',
+             en: 'Top-field melody over a fixed left hand · hand independence (L4 · 12 notes)' },
+    body:
+`@BPM 84
 
-R: D . 2 . D . 2 . | D . 2 . D . 2 . | D . 2 . D . 2 . | D . 2 . D . 2 .
-L: 8 . . 7 . . 6 . | 8 . . 7 . . 6 . | 8 . . 7 . . 6 . | 8 . . 7 . . 6 .
+R: .  9  .  9  .  10 .  11 | .  9  .  11 .  10 .  9  | .  11 .  10 .  9  .  7  | .  9  .  7  .  5  .  .
+L: 4  .  2  .  4  .  2  .  | 4  .  2  .  4  .  2  .  | 4  .  2  .  4  .  2  .  | 4  .  2  .  4  .  2  .
 
-R: D . 1 . D . 1 . | D . 1 . D . 1 . | D . 1 . D . 1 . | D . 1 . D . 1 .
-L: 8 . . 7 . . 6 . | 8 . . 7 . . 6 . | 8 . . 7 . . 6 . | 8 . . 7 . . 7 .
+R: .  9  .  9  .  10 .  11 | .  9  .  11 .  10 .  9  | .  11 .  10 .  9  .  7  | .  9  .  7  .  5  D  .
+L: 4  .  2  .  4  .  2  .  | 4  .  2  .  4  .  2  .  | 4  .  2  .  4  .  2  .  | 4  .  2  .  4  .  .  .`,
+  },
+  'L5': {
+    title: { zh: 'L5 鼓与歌', en: 'L5 Drum & Song' },
+    desc:  { zh: '鼓与歌 · 打击段落与旋律段落切换 (L5 · 12 音)',
+             en: 'Drum & song · switching between percussive and melodic sections (L5 · 12 notes)' },
+    body:
+`@BPM 100
 
-R: D . 2 . D . 2 . | D . 2 . D . 2 . | D . 1 . D . 1 . | D . 1 . T . D .
-L: 6 . . 6 . . 6 . | . 6 . . 6 . . . | 4 . . 4 . . 4 . | . 4 . D . . . .
+R: D  .  T  .  S  .  T  .  | D  .  T  .  S  .  9  .  | D  .  T  .  S  .  T  .  | D  .  T  .  5  3  D  .
+L: .  4  .  .  .  6  .  .  | .  4  .  .  .  6  .  .  | .  4  .  .  .  6  .  .  | .  4  .  .  .  .  .  .
 
-R: D
-L: 4`;
+R: 6  .  S  .  7  .  9  .  | .  9  .  11 .  9  .  .  | 6  .  S  .  7  .  9  .  | 9  .  7  .  5  .  D  T
+L: 4  .  .  6  .  8  .  .  | 8  .  10 .  .  .  6  .  | 4  .  .  6  .  8  .  .  | .  8  .  6  .  4  .  .`,
+  },
+};
+function builtinTitle(id){ const t = BUILTINS[id].title; return t[lang] || t.en; }
+function builtinScore(id){ const b = BUILTINS[id]; return '# ' + (b.desc[lang] || b.desc.en) + '\n' + b.body; }
 
 /* =========================== Build the SVG pan ======================= */
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -1648,7 +1689,6 @@ pdfFile.addEventListener('change', async () => {
  * blocking dialog. When localStorage is unavailable (sandboxed preview,
  * private mode) the +/✕ buttons hide and built-ins keep working.        */
 const LIB_KEY = 'handpan_scores_v1';
-const BUILTINS = { 'Pocket Groove 11': DEFAULT_SCORE };
 
 function libRead(){
   const s = store();
@@ -1692,7 +1732,7 @@ function refreshLib(keepValue){
   gb.label = tr('builtinGroup');
   for (const n in BUILTINS){
     const o = document.createElement('option');
-    o.value = 'b:' + n; o.textContent = n;
+    o.value = 'b:' + n; o.textContent = builtinTitle(n);
     gb.appendChild(o);
   }
   libSel.appendChild(gb);
@@ -1713,10 +1753,10 @@ function refreshLib(keepValue){
 }
 
 function loadSelected(){
-  const text = selIsBuiltin() ? BUILTINS[selName()] : libRead()[selName()];
+  const text = selIsBuiltin() ? builtinScore(selName()) : libRead()[selName()];
   if (text == null) return;
   scoreText.value = text;
-  applyScore('loaded', selName());
+  applyScore('loaded', selIsBuiltin() ? builtinTitle(selName()) : selName());
   dirty = false;
 }
 
@@ -1795,7 +1835,14 @@ function setLang(l){
   btnPlay.textContent = playing ? tr('pause') : tr('play');   // state-dependent, set after the sweep
   btnImmersive.textContent = immersive ? tr('exitImmersive') : tr('immersive');   // ditto
   const s = store(); if (s) s.setItem('handpan_lang', l);
-  refreshLib();      // optgroup labels
+  refreshLib();      // optgroup labels + translated built-in titles
+  // Swap a loaded built-in's `#` description into the new language; skip
+  // when the editor has unsaved edits or playback is running (applyScore
+  // inside loadSelected would stop it). loadSelected sets a fresh status.
+  if (selIsBuiltin() && !dirty && !playing){
+    loadSelected();
+    return;
+  }
   renderTrack();     // column tooltips
   if (lastStatus){    // status bar text was baked in the old language — regenerate it
     if (lastStatus.apply){

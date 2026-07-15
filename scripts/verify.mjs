@@ -207,7 +207,14 @@ await check('score tempo directives drive per-event BPM and scale UI', async () 
   } finally {
     await page.evaluate(score => { scoreText.value = score; applyScore(); }, originalScore);
   }
-  const restored = await page.evaluate(() => ({dynamic:bpmControlDynamic, label:bpmLabelEl.textContent}));
+  // A directive-free score must flip the UI back to plain BPM mode (the
+  // built-in default now carries @BPM, so test the transition explicitly).
+  const restored = await page.evaluate(() => {
+    scoreText.value = 'R: D . D .\nL: . 1 . 1';
+    applyScore();
+    return {dynamic: bpmControlDynamic, label: bpmLabelEl.textContent};
+  });
+  await page.evaluate(score => { scoreText.value = score; applyScore(); }, originalScore);
   if (restored.dynamic || restored.label !== 'Tempo BPM')
     throw new Error(`plain BPM UI was not restored: ${JSON.stringify(restored)}`);
 });
@@ -215,7 +222,16 @@ await check('score tempo directives drive per-event BPM and scale UI', async () 
 await check('PDF recognition preserves measure-number progress labels', async () => {
   const originalScore = await page.locator('#scoreText').inputValue();
   try {
-    await page.evaluate(() => { tempoScale = 100; setLang('zh'); });
+    await page.evaluate(() => {
+      setLang('zh');
+      // Start from a directive-free score so the first import exercises the
+      // plain -> 100% scale-mode transition (the default score has @BPM now).
+      // Reset tempoScale after the mode switch: configureBpmControl saves the
+      // outgoing slider value into it when leaving scale mode.
+      scoreText.value = 'R: D .\nL: . 1';
+      applyScore();
+      tempoScale = 100;
+    });
     const pdfs = [
       ['Notepan - Pocket Groove 11.pdf', [110]],
       ['Pocket Groove 10.pdf', [118]],

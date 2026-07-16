@@ -1885,10 +1885,14 @@ const DETECT_FFT = 2048;      // onset detection: 43 ms window follows fast play
  * phone AGC). The sensitivity slider scales the onset threshold at runtime. */
 const FOLLOW = {
   fluxRatio:    2.3,    // onset when weighted flux exceeds this × its average
-  minFluxRel:   0.6,    // flux floor relative to the average frame magnitude —
+  minFluxRel:   0.3,    // flux floor relative to the average frame magnitude —
                         // level-adaptive because iOS raw (AGC-off) mic input
                         // sits ~10× below desktop levels and absolute floors
-                        // never fire there
+                        // never fire there. iPhone hardware voice processing
+                        // also halves the strike transient relative to the
+                        // ringing background (measured: sens 2.5 on iOS ≈
+                        // sens 1.2 on Android at the earlier 0.6 floor), so
+                        // the floor sits low and desktop relies on fluxRatio
   minFlux:      0.005,  // last-resort absolute floor for near-silence (magEma≈0)
   minLevelDb:   -76,    // ignore onsets whose loudest bin is below this
   refractoryMs: 120,    // one strike = one onset
@@ -1903,6 +1907,7 @@ const FOLLOW = {
 let followOn = false, followPos = 0, followRaf = 0;
 let micStream = null, micSource = null, micAnalyser = null, micDetector = null;
 let followCtx = null;   // dedicated analysis context (see startFollow)
+let micTrackRate = 0;   // sample rate the mic track reports, 0 = unknown
 let followTpls = null, followBinHz = 0;
 let fluxEma = 0, magEma = 0, lastOnsetAt = 0;
 let detCur = null, detPrev = null, detReady = false, detWeight = null, detLo = 0, detHi = 0;
@@ -2121,7 +2126,8 @@ function followLoop(){
     const dbg = document.getElementById('micDebug');
     if (dbg && (meterFrame & 31) === 0)
       dbg.textContent = peakDb.toFixed(0) + 'dB · f ' + flux.toFixed(3) + '/' +
-        thresh.toFixed(3) + ' · ' + (micDetector.context.sampleRate / 1000) + 'k';
+        thresh.toFixed(3) + ' · ctx' + (micDetector.context.sampleRate / 1000) +
+        'k/mic' + (micTrackRate ? micTrackRate / 1000 + 'k' : '?');
   }
   detReady = true;
   followRaf = requestAnimationFrame(followLoop);
@@ -2133,6 +2139,19 @@ async function acquireWakeLock(){
 document.addEventListener('visibilitychange', () => {
   if (followOn && document.visibilityState === 'visible') acquireWakeLock();
 });
+
+// Create an analysis AudioContext and prove it runs; null when it can't
+// (e.g. WebKit refuses resume() because the user activation was already
+// consumed by getUserMedia). Callers fall back rather than fail.
+async function tryAnalysisCtx(opts){
+  try {
+    const c = new (window.AudioContext || window.webkitAudioContext)(opts);
+    if (c.state === 'suspended') await c.resume();
+    if (c.state === 'running') return c;
+    c.close();
+  } catch (e){}
+  return null;
+}
 
 async function startFollow(){
   if (followOn) return;
@@ -2157,12 +2176,21 @@ async function startFollow(){
   // (more than a semitone) and every note would classify wrong. A fresh
   // context adopts the record session's rate. Fall back to the playback
   // context when it can't start (no worse than the previous behaviour).
-  try {
-    followCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (followCtx.state === 'suspended') await followCtx.resume();
-    if (followCtx.state !== 'running'){ followCtx.close(); followCtx = null; }
-  } catch (e){ followCtx = null; }
-  const mctx = followCtx || actx;
+  followCtx = await tryAnalysisCtx();
+  const track = stream.getAudioTracks()[0];
+  micTrackRate = (track && track.getSettings && track.getSettings().sampleRate) || 0;
+  let mctx = followCtx || actx;
+  // Hard guarantee: when the track reports its rate and the analysis context
+  // disagrees, rebuild the context at that exact rate (Safari 14.1+ honours
+  // the sampleRate option) so the template bins stay on the true axis.
+  if (micTrackRate && mctx.sampleRate !== micTrackRate){
+    const exact = await tryAnalysisCtx({sampleRate: micTrackRate});
+    if (exact){
+      if (followCtx) followCtx.close();
+      followCtx = exact;
+      mctx = exact;
+    }
+  }
   micSource = mctx.createMediaStreamSource(stream);
   micAnalyser = mctx.createAnalyser();         // classification (fine bins)
   micAnalyser.fftSize = FOLLOW_FFT;

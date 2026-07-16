@@ -1885,8 +1885,12 @@ const DETECT_FFT = 2048;      // onset detection: 43 ms window follows fast play
  * phone AGC). The sensitivity slider scales the onset threshold at runtime. */
 const FOLLOW = {
   fluxRatio:    2.3,    // onset when weighted flux exceeds this × its average
-  minFlux:      0.05,   // absolute flux floor (weighted linear magnitude sum)
-  minLevelDb:   -68,    // ignore onsets whose loudest bin is below this
+  minFluxRel:   0.6,    // flux floor relative to the average frame magnitude —
+                        // level-adaptive because iOS raw (AGC-off) mic input
+                        // sits ~10× below desktop levels and absolute floors
+                        // never fire there
+  minFlux:      0.005,  // last-resort absolute floor for near-silence (magEma≈0)
+  minLevelDb:   -76,    // ignore onsets whose loudest bin is below this
   refractoryMs: 120,    // one strike = one onset
   classifyDelayMs: 70,  // let partials develop past the strike noise
   preSnapshotMs: 90,    // how far before the onset the reference spectrum sits
@@ -1898,8 +1902,9 @@ const FOLLOW = {
 
 let followOn = false, followPos = 0, followRaf = 0;
 let micStream = null, micSource = null, micAnalyser = null, micDetector = null;
+let followCtx = null;   // dedicated analysis context (see startFollow)
 let followTpls = null, followBinHz = 0;
-let fluxEma = 0, lastOnsetAt = 0;
+let fluxEma = 0, magEma = 0, lastOnsetAt = 0;
 let detCur = null, detPrev = null, detReady = false, detWeight = null, detLo = 0, detHi = 0;
 let snapRing = null, snapIdx = 0, preSpec = null, postSpec = null, deltaSpec = null;
 let meterFrame = 0, wakeLock = null, lastFollowRow = null;
@@ -2087,10 +2092,11 @@ function followLoop(){
   // onset detection on the short-window analyser: high-frequency-weighted
   // flux makes the strike's broadband attack stand out over ringing tails
   micDetector.getFloatFrequencyData(detCur);
-  let flux = 0, peakDb = -Infinity;
+  let flux = 0, mag = 0, peakDb = -Infinity;
   for (let i = detLo; i < detHi; i++){
     const c = Math.pow(10, Math.max(-100, detCur[i]) / 20);
     const p = Math.pow(10, Math.max(-100, detPrev[i]) / 20);
+    mag += c * detWeight[i];
     if (c > p) flux += (c - p) * detWeight[i];
     if (detCur[i] > peakDb) peakDb = detCur[i];
   }
@@ -2099,15 +2105,23 @@ function followLoop(){
     micMeterFill.style.width = Math.max(0, Math.min(100, (peakDb + 80) * (100 / 55))) + '%';
   if (detReady){
     const sens = Number(sensSlider && sensSlider.value) || 1;
-    if (flux > Math.max(FOLLOW.minFlux, fluxEma * FOLLOW.fluxRatio) / sens &&
-        peakDb > FOLLOW.minLevelDb && now - lastOnsetAt > FOLLOW.refractoryMs){
+    const thresh = Math.max(FOLLOW.minFlux, FOLLOW.minFluxRel * magEma,
+                            fluxEma * FOLLOW.fluxRatio) / sens;
+    if (flux > thresh && peakDb > FOLLOW.minLevelDb &&
+        now - lastOnsetAt > FOLLOW.refractoryMs){
       lastOnsetAt = now;
       capturePreSpec(now);
       setTimeout(handleFollowOnset, FOLLOW.classifyDelayMs);
     }
-    // a fresh strike must not raise the adaptive floor and mask fast runs
-    if (now - lastOnsetAt > FOLLOW.emaFreezeMs)
+    // a fresh strike must not raise the adaptive floors and mask fast runs
+    if (now - lastOnsetAt > FOLLOW.emaFreezeMs){
       fluxEma = fluxEma * 0.9 + flux * 0.1;
+      magEma = magEma * 0.9 + mag * 0.1;
+    }
+    const dbg = document.getElementById('micDebug');
+    if (dbg && (meterFrame & 31) === 0)
+      dbg.textContent = peakDb.toFixed(0) + 'dB · f ' + flux.toFixed(3) + '/' +
+        thresh.toFixed(3) + ' · ' + (micDetector.context.sampleRate / 1000) + 'k';
   }
   detReady = true;
   followRaf = requestAnimationFrame(followLoop);
@@ -2136,18 +2150,31 @@ async function startFollow(){
       echoCancellation: false, noiseSuppression: false, autoGainControl: false}});
   } catch (e){ setStatus('followMicDenied'); return; }
   micStream = stream;
-  micSource = actx.createMediaStreamSource(stream);
-  micAnalyser = actx.createAnalyser();         // classification (fine bins)
+  // Analyse on a context created AFTER the mic is live: iOS switches the
+  // hardware to a record session (usually 48 kHz) when capture starts, and
+  // WebKit's MediaStreamSource does not resample into an older context
+  // running at the playback rate — the FFT frequency axis would be ~9% off
+  // (more than a semitone) and every note would classify wrong. A fresh
+  // context adopts the record session's rate. Fall back to the playback
+  // context when it can't start (no worse than the previous behaviour).
+  try {
+    followCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (followCtx.state === 'suspended') await followCtx.resume();
+    if (followCtx.state !== 'running'){ followCtx.close(); followCtx = null; }
+  } catch (e){ followCtx = null; }
+  const mctx = followCtx || actx;
+  micSource = mctx.createMediaStreamSource(stream);
+  micAnalyser = mctx.createAnalyser();         // classification (fine bins)
   micAnalyser.fftSize = FOLLOW_FFT;
   micAnalyser.smoothingTimeConstant = 0;
-  micDetector = actx.createAnalyser();         // onset detection (short window)
+  micDetector = mctx.createAnalyser();         // onset detection (short window)
   micDetector.fftSize = DETECT_FFT;
   micDetector.smoothingTimeConstant = 0;
   micSource.connect(micAnalyser);              // analysis only, never to output
   micSource.connect(micDetector);
-  buildFollowTemplates(actx.sampleRate);
+  buildFollowTemplates(mctx.sampleRate);
   const bins = micAnalyser.frequencyBinCount, detBins = micDetector.frequencyBinCount;
-  const detBinHz = actx.sampleRate / DETECT_FFT;
+  const detBinHz = mctx.sampleRate / DETECT_FFT;
   preSpec = new Float32Array(bins); postSpec = new Float32Array(bins);
   deltaSpec = new Float32Array(bins);
   snapRing = Array.from({length: 8}, () => ({t: 0, data: new Float32Array(bins)}));
@@ -2158,13 +2185,21 @@ async function startFollow(){
   detWeight = new Float32Array(detBins);
   for (let i = detLo; i < detHi; i++)
     detWeight[i] = Math.min(3, 0.5 + (i * detBinHz) / 3000);   // HFC emphasis
-  detReady = false; fluxEma = 0; lastOnsetAt = 0; meterFrame = 0;
+  detReady = false; fluxEma = 0; magEma = 0; lastOnsetAt = 0; meterFrame = 0;
   followOn = true;
   followPos = 0;
   lastFollowRow = null;
   document.body.classList.add('follow');
   followBar.hidden = false;
   followState.textContent = tr('followListening');
+  // #micdebug in the URL surfaces live detector numbers next to the status —
+  // the only way to read them on a phone, where devtools aren't reachable.
+  if (location.hash.indexOf('micdebug') !== -1 && !document.getElementById('micDebug')){
+    const d = document.createElement('span');
+    d.id = 'micDebug';
+    d.style.cssText = 'font:11px/1.2 ui-monospace,monospace;opacity:.7;margin-left:8px;';
+    followState.after(d);
+  }
   computeRowBands();   // follow mode's larger font reflows the score into new rows
   const first = followTargetIdx();
   if (first >= 0) highlightToken(first);
@@ -2185,6 +2220,7 @@ function stopFollow(){
   cancelAnimationFrame(followRaf);
   if (micSource) micSource.disconnect();
   if (micStream) micStream.getTracks().forEach(t => t.stop());
+  if (followCtx){ try { followCtx.close(); } catch (e){} followCtx = null; }
   micStream = micSource = micAnalyser = micDetector = null;
   snapRing = preSpec = postSpec = deltaSpec = detCur = detPrev = detWeight = null;
   document.body.classList.remove('follow');

@@ -35,10 +35,14 @@ workflows:
       - name: Add iOS platform (regenerated fresh on every build — see ios-app/README.md)
         script: |
           cd ios-app && npx cap add ios
-      - name: Declare microphone usage (跟弹模式; the generated Info.plist has no mic entry)
+      - name: Patch the regenerated Info.plist (mic usage, export compliance)
         script: |
           plutil -replace NSMicrophoneUsageDescription \
             -string "跟弹模式需要使用麦克风识别你的手碟演奏" \
+            ios-app/ios/App/App/Info.plist
+          # HTTPS/system crypto only (exempt) — skips the manual TestFlight
+          # export-compliance question on every build
+          plutil -replace ITSAppUsesNonExemptEncryption -bool NO \
             ios-app/ios/App/App/Info.plist
       - name: Restrict target to iPhone only (Capacitor's default template is Universal)
         script: |

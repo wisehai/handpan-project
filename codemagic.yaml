@@ -19,8 +19,8 @@ workflows:
         # Marketing version (CFBundleShortVersionString). The regenerated
         # Capacitor project defaults to 1.0; App Store Connect closes a
         # version's train once it ships, so bump this after each release
-        # (1.0 is closed — TestFlight rejects new 1.0 builds, code 90186).
-        APP_VERSION: "1.1"
+        # (1.1 is closed — TestFlight rejects new 1.0 builds, code 90186).
+        APP_VERSION: "1.2"
     scripts:
       - name: Copy web app into ios-app/www
         script: |

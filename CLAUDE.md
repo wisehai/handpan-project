@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 A single self-contained HTML file (`handpan-player.html`) implementing a browser-based handpan
-(D Kurd 8+1 / "Pocket Groove 11") player: SVG pan visualization, Web Audio synthesis, and an
+(D Kurd 10+1) player: SVG pan visualization, Web Audio synthesis, and an
 editable two-row text score format. No build step, no package manager, no test runner — all
 HTML/CSS/JS lives in this one file. The only external dependency is pdf.js, lazy-loaded from a
 CDN at runtime when the user imports a PDF score.

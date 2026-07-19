@@ -1907,6 +1907,12 @@ const FOLLOW = {
 let followOn = false, followPos = 0, followRaf = 0;
 let micStream = null, micSource = null, micAnalyser = null, micDetector = null;
 let followCtx = null;   // dedicated analysis context (see startFollow)
+// Native follow mode (iOS wrapper only): the capacitor-handpan-follow plugin
+// (private repo) taps the mic via AVAudioEngine instead of getUserMedia. This
+// skeleton stage only proves the round trip (raw RMS via #micdebug) — it does
+// not yet drive followTargetIdx/highlightToken; the real onset/pitch
+// classification is still the FOLLOW pipeline below, pending a native port.
+let usingNativeFollow = false, nativeFollowListener = null;
 let micTrackRate = 0;   // sample rate the mic track reports, 0 = unknown
 let followTpls = null, followBinHz = 0;
 let fluxEma = 0, magEma = 0, lastOnsetAt = 0;
@@ -2156,6 +2162,41 @@ async function tryAnalysisCtx(opts){
 async function startFollow(){
   if (followOn) return;
   if (!events.some(e => e.hits.length)){ setStatus('emptyScore'); return; }
+
+  const nativeFollow = window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.HandpanFollow : null;
+  if (nativeFollow){
+    ensureCtx();
+    stopPlay(true);
+    try {
+      nativeFollowListener = await nativeFollow.addListener('noteEvent', ev => {
+        const d = document.getElementById('micDebug');
+        if (d) d.textContent = `native rms=${ev.level.toFixed(3)}`;
+      });
+      await nativeFollow.startFollow();
+    } catch (e){ setStatus('followMicDenied'); return; }
+    usingNativeFollow = true;
+    followOn = true;
+    followPos = 0;
+    lastFollowRow = null;
+    document.body.classList.add('follow');
+    followBar.hidden = false;
+    followState.textContent = tr('followListening');
+    if (location.hash.indexOf('micdebug') !== -1 && !document.getElementById('micDebug')){
+      const d = document.createElement('span');
+      d.id = 'micDebug';
+      d.style.cssText = 'font:11px/1.2 ui-monospace,monospace;opacity:.7;margin-left:8px;';
+      followState.after(d);
+    }
+    computeRowBands();
+    const first = followTargetIdx();
+    if (first >= 0) highlightToken(first);
+    try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch (e){}
+    try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch (e){}
+    acquireWakeLock();
+    updateStandaloneMetro();
+    return;
+  }
+
   if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
     setStatus('followNoMic'); return;
   }
@@ -2246,6 +2287,13 @@ function stopFollow(){
   followOn = false;
   lastFollowRow = null;
   cancelAnimationFrame(followRaf);
+  if (usingNativeFollow){
+    const nativeFollow = window.Capacitor?.Plugins?.HandpanFollow;
+    if (nativeFollow) nativeFollow.stopFollow().catch(() => {});
+    if (nativeFollowListener) nativeFollowListener.remove();
+    nativeFollowListener = null;
+    usingNativeFollow = false;
+  }
   if (micSource) micSource.disconnect();
   if (micStream) micStream.getTracks().forEach(t => t.stop());
   if (followCtx){ try { followCtx.close(); } catch (e){} followCtx = null; }

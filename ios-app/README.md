@@ -9,8 +9,30 @@
 macOS 上——本地开发机（Linux）和现有的 2015 款 MacBook（装不了新版 Xcode）都跑不了这一步。
 
 所以这里换了个策略：`ios/` 目录**完全不提交**，每次在 Codemagic 的云端 macOS 构建机上、从
-`capacitor.config.json` + `assets/` 现生成一份全新的原生工程。这样保证结果始终和配置文件一致，
-也意味着本地和这台旧 Mac 上永远不需要打开 Xcode——所有构建、签名、打包都在云端完成。
+`capacitor.config.json` + `assets/` 现生成一份全新的原生工程。这样保证结果始终和配置文件一致。
+
+（更新：现在有了一台能跑完整 Xcode 的 Mac，本地也可以走一遍同样的生成流程调试，见下面"本地开发"
+一节；但发正式 TestFlight 版本仍然走 Codemagic 云端流程，两者不冲突。）
+
+## 本地开发（在能跑 Xcode 的 Mac 上）
+
+```bash
+npm install                                  # 会顺带链接 ../../handpan-native 这个私有插件仓库
+mkdir -p www/vendor/pdfjs
+cp ../handpan-player.html www/index.html
+cp ../vendor/pdfjs/pdf.min.js www/vendor/pdfjs/pdf.min.js
+cp ../vendor/pdfjs/pdf.worker.min.js www/vendor/pdfjs/pdf.worker.min.js
+npx cap add ios                              # 现生成 ios/，和 Codemagic 每次做的事一样
+plutil -replace NSMicrophoneUsageDescription \
+  -string "跟弹模式需要使用麦克风识别你的手碟演奏" \
+  ios/App/App/Info.plist                     # 手动补上下面"构建流程"第 3 步 Codemagic 会自动做的那一步
+npx cap open ios                             # 在 Xcode 里跑模拟器或真机
+```
+
+`ios/` 每次用 `npx cap add ios` 重新生成时，上面的 `plutil` 步骤都要重新跑一次（生成的 Info.plist
+不带这条，只有 Codemagic 流程里才会自动注入）。这一步不做的话，跟弹模式一请求麦克风权限 App 就会
+被系统直接杀掉（iOS 对没有 `NSMicrophoneUsageDescription` 却访问麦克风的 App 是硬性拒绝，不是弹
+提示）。
 
 ## 构建流程（由 `../codemagic.yaml` 驱动，不是本地命令）
 

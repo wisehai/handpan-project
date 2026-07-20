@@ -4,5 +4,10 @@ node_modules/
 # tooling that can't run on this machine, so it's regenerated fresh on every
 # Codemagic build via `npx cap add ios` (see README.md)
 ios/
-# generated copy of ../handpan-player.html (see README's rebuild steps) — not source
+# generated copy of ../handpan-player.html and ../vendor/pdfjs/ (see README's
+# rebuild steps) — not source
 www/index.html
+www/vendor/
+# local journal directory some codemagic-cli-tools / xcodebuild invocation
+# creates under ios-app/ — not something we created intentionally
+.vmark/

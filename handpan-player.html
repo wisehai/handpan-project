@@ -1909,12 +1909,13 @@ let micStream = null, micSource = null, micAnalyser = null, micDetector = null;
 let followCtx = null;   // dedicated analysis context (see startFollow)
 // Native follow mode (iOS wrapper only): the capacitor-handpan-follow plugin
 // (private repo) taps the mic via AVAudioEngine instead of getUserMedia.
-// Milestone 1 (current): native onset detection is real (ported
-// OnsetDetector), surfaced only via #micdebug/console — it does not yet
-// drive followTargetIdx/highlightToken. Note classification (which note was
-// struck) is still unported; the FOLLOW pipeline below remains the only
-// path that actually advances the score cursor, on iOS included.
-let usingNativeFollow = false, nativeFollowListener = null, nativeOnsetListener = null;
+// Milestone 2 (current): both onset detection and note classification are
+// real natively-ported code (OnsetDetector/FollowClassifier), but only
+// shadow into #micdebug/console for comparison — neither drives
+// followTargetIdx/highlightToken yet. The FOLLOW pipeline below remains the
+// only path that actually advances the score cursor, on iOS included, until
+// milestone 3 wires applyFollowScores up to the native onsetEvent.
+let usingNativeFollow = false, nativeFollowListener = null, nativeOnsetListener = null, nativeClassifyListener = null;
 let micTrackRate = 0;   // sample rate the mic track reports, 0 = unknown
 let followTpls = null, followBinHz = 0;
 let fluxEma = 0, magEma = 0, lastOnsetAt = 0;
@@ -2189,6 +2190,16 @@ async function startFollow(){
         console.log('[native onset]', 'peakDb=', ev.peakDb.toFixed(1),
           'flux=', ev.flux.toFixed(4), 'thresh=', ev.threshold.toFixed(4));
       });
+      // Milestone-2 shadow mode: real classification results, shown for
+      // comparison only — NOT wired to applyFollowScores/followAdvance yet
+      // (that's milestone 3). Safe to leave running: it can't affect the
+      // score cursor no matter what it says.
+      nativeClassifyListener = await nativeFollow.addListener('onsetEvent', ev => {
+        const top = ev.candidates.slice(0, 3).map(c => `${c.key}:${c.score.toFixed(2)}`).join(' ');
+        console.log('[native classify]', top);
+        const d = document.getElementById('micDebug');
+        if (d) d.textContent = `native heard: ${top}`;
+      });
       await nativeFollow.startFollow();
       await nativeFollow.setSensitivity({value: Number(sensSlider && sensSlider.value) || 1});
     } catch (e){ setStatus('followMicDenied'); return; }
@@ -2310,8 +2321,10 @@ function stopFollow(){
     if (nativeFollow) nativeFollow.stopFollow().catch(() => {});
     if (nativeFollowListener) nativeFollowListener.remove();
     if (nativeOnsetListener) nativeOnsetListener.remove();
+    if (nativeClassifyListener) nativeClassifyListener.remove();
     nativeFollowListener = null;
     nativeOnsetListener = null;
+    nativeClassifyListener = null;
     usingNativeFollow = false;
   }
   if (micSource) micSource.disconnect();

@@ -50,9 +50,15 @@ PWA 部分）。
 
 ### 已知限制
 
-iPhone 侧边物理静音拨片打开时，页面里合成的声音会被系统静音——这是 WebKit 对纯 Web Audio API 输出
-（没有真实 `<audio>`/`<video>` 播放过内容）的平台级限制，目前没有可靠的纯前端绕过方法。使用前请确认
-手机不是静音状态。
+**网页版/PWA**：iPhone 侧边物理静音拨片打开时，页面里合成的声音会被系统静音——这是 WebKit 对纯
+Web Audio API 输出（没有真实 `<audio>`/`<video>` 播放过内容）的平台级限制，目前没有可靠的纯前端
+绕过方法。使用前请确认手机不是静音状态。
+
+**iOS 原生 App**：已修复，静音拨片打开时也能正常出声。原生插件（私有仓库 `handpan-native`）在
+App 启动时把 `AVAudioSession` 切到 `.playback` 并保持一个近似静音的音频流持续播放（不能只设一次
+类别就不管，来电/切路由/切后台都可能让系统把它重置回去，所以配了通知监听自动恢复），同时把网页里
+一次性播放的静音解锁片段也改成了原生壳内持续循环播放——真机验证发现只做前者还不够，WebKit 对
+WKWebView 内部音频会话的管理比预期更独立，两边都要做才行。
 
 ### 项目结构与开发说明
 
@@ -109,10 +115,18 @@ cloud macOS machines (no local Mac/Xcode needed) — see [`codemagic.yaml`](code
 
 ### Known limitations
 
-When an iPhone's physical mute switch is on, the page's synthesized sound gets muted by the
-system — a platform-level limitation of WebKit for pure Web Audio API output (no real
+**Web/PWA**: When an iPhone's physical mute switch is on, the page's synthesized sound gets muted
+by the system — a platform-level limitation of WebKit for pure Web Audio API output (no real
 `<audio>`/`<video>` element has played anything). There's currently no reliable pure-frontend
 workaround. Make sure your phone isn't muted before using it.
+
+**Native iOS app**: fixed — sound plays fine even with the mute switch on. The native plugin
+(private repo `handpan-native`) puts `AVAudioSession` into `.playback` at app launch and keeps a
+near-silent audio stream genuinely running (not just category-set once — interruptions/route
+changes/backgrounding can silently reset it, so it self-heals via notification observers), and the
+page's one-shot silent-unlock clip was also changed to loop continuously inside the native wrapper.
+On-device testing showed the app-level fix alone wasn't enough — WebKit manages the WKWebView's own
+internal audio session more independently than expected, so both pieces were needed.
 
 ### Project structure & dev notes
 

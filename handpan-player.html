@@ -2169,6 +2169,7 @@ async function startFollow(){
     stopPlay(true);
     try {
       nativeFollowListener = await nativeFollow.addListener('noteEvent', ev => {
+        console.log('[native follow] rms=', ev.level.toFixed(3));
         const d = document.getElementById('micDebug');
         if (d) d.textContent = `native rms=${ev.level.toFixed(3)}`;
       });

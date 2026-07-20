@@ -1908,11 +1908,13 @@ let followOn = false, followPos = 0, followRaf = 0;
 let micStream = null, micSource = null, micAnalyser = null, micDetector = null;
 let followCtx = null;   // dedicated analysis context (see startFollow)
 // Native follow mode (iOS wrapper only): the capacitor-handpan-follow plugin
-// (private repo) taps the mic via AVAudioEngine instead of getUserMedia. This
-// skeleton stage only proves the round trip (raw RMS via #micdebug) — it does
-// not yet drive followTargetIdx/highlightToken; the real onset/pitch
-// classification is still the FOLLOW pipeline below, pending a native port.
-let usingNativeFollow = false, nativeFollowListener = null;
+// (private repo) taps the mic via AVAudioEngine instead of getUserMedia.
+// Milestone 1 (current): native onset detection is real (ported
+// OnsetDetector), surfaced only via #micdebug/console — it does not yet
+// drive followTargetIdx/highlightToken. Note classification (which note was
+// struck) is still unported; the FOLLOW pipeline below remains the only
+// path that actually advances the score cursor, on iOS included.
+let usingNativeFollow = false, nativeFollowListener = null, nativeOnsetListener = null;
 let micTrackRate = 0;   // sample rate the mic track reports, 0 = unknown
 let followTpls = null, followBinHz = 0;
 let fluxEma = 0, magEma = 0, lastOnsetAt = 0;
@@ -1930,6 +1932,12 @@ function updateSensitivity(){
   if (!sensSlider) return;
   if (sensValue) sensValue.value = Number(sensSlider.value).toFixed(1);
   const s = store(); if (s) s.setItem('handpan_sens', sensSlider.value);
+  // Native mode can't poll sensSlider.value every frame like followLoop
+  // does for the web path, so live slider drags must be pushed explicitly.
+  if (usingNativeFollow){
+    const nativeFollow = window.Capacitor?.Plugins?.HandpanFollow;
+    if (nativeFollow) nativeFollow.setSensitivity({value: Number(sensSlider.value) || 1}).catch(() => {});
+  }
 }
 if (sensSlider){
   updateSensitivity();
@@ -2173,7 +2181,16 @@ async function startFollow(){
         const d = document.getElementById('micDebug');
         if (d) d.textContent = `native rms=${ev.level.toFixed(3)}`;
       });
+      // Milestone-1 debug channel: raw onset detection only, no note
+      // classification yet (that's FollowClassifier/onsetEvent, milestone
+      // 2) — this just proves the native OnsetDetector fires on real
+      // strikes with plausible timing, doesn't drive the score cursor.
+      nativeOnsetListener = await nativeFollow.addListener('onsetDebugEvent', ev => {
+        console.log('[native onset]', 'peakDb=', ev.peakDb.toFixed(1),
+          'flux=', ev.flux.toFixed(4), 'thresh=', ev.threshold.toFixed(4));
+      });
       await nativeFollow.startFollow();
+      await nativeFollow.setSensitivity({value: Number(sensSlider && sensSlider.value) || 1});
     } catch (e){ setStatus('followMicDenied'); return; }
     usingNativeFollow = true;
     followOn = true;
@@ -2292,7 +2309,9 @@ function stopFollow(){
     const nativeFollow = window.Capacitor?.Plugins?.HandpanFollow;
     if (nativeFollow) nativeFollow.stopFollow().catch(() => {});
     if (nativeFollowListener) nativeFollowListener.remove();
+    if (nativeOnsetListener) nativeOnsetListener.remove();
     nativeFollowListener = null;
+    nativeOnsetListener = null;
     usingNativeFollow = false;
   }
   if (micSource) micSource.disconnect();

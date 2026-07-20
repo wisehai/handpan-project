@@ -1909,12 +1909,10 @@ let micStream = null, micSource = null, micAnalyser = null, micDetector = null;
 let followCtx = null;   // dedicated analysis context (see startFollow)
 // Native follow mode (iOS wrapper only): the capacitor-handpan-follow plugin
 // (private repo) taps the mic via AVAudioEngine instead of getUserMedia.
-// Milestone 2 (current): both onset detection and note classification are
-// real natively-ported code (OnsetDetector/FollowClassifier), but only
-// shadow into #micdebug/console for comparison — neither drives
-// followTargetIdx/highlightToken yet. The FOLLOW pipeline below remains the
-// only path that actually advances the score cursor, on iOS included, until
-// milestone 3 wires applyFollowScores up to the native onsetEvent.
+// All three milestones landed: onset detection and note classification are
+// natively-ported code (OnsetDetector/FollowClassifier), and the native
+// onsetEvent now drives the score cursor through the same applyFollowScores
+// the local web analyser path uses (see startFollow/handleFollowOnset).
 let usingNativeFollow = false, nativeFollowListener = null, nativeOnsetListener = null, nativeClassifyListener = null;
 let micTrackRate = 0;   // sample rate the mic track reports, 0 = unknown
 let followTpls = null, followBinHz = 0;
@@ -2054,15 +2052,14 @@ function followJumpTo(evIdx){
   if (idx >= 0) highlightToken(idx);
 }
 
-function handleFollowOnset(){
-  if (!followOn) return;
-  micAnalyser.getFloatFrequencyData(postSpec);
-  for (let i = 0; i < deltaSpec.length; i++){
-    const post = Math.pow(10, Math.max(-100, postSpec[i]) / 20);
-    const pre = Math.pow(10, Math.max(-100, preSpec[i]) / 20);
-    deltaSpec[i] = post > pre ? post - pre : 0;
-  }
-  const scores = classifyFollowSpectrum(deltaSpec);
+// Score-navigation half of onset handling: given a ranked candidate list
+// (from classifyFollowSpectrum locally, or the native onsetEvent's
+// candidates — same {key,score}[] shape either way), decide whether to
+// advance the cursor, catch up past a missed detection, or flag a miss.
+// Shared by both the local web analyser path (handleFollowOnset below) and
+// the native iOS path (startFollow's onsetEvent listener) so this logic
+// only exists once.
+function applyFollowScores(scores){
   if (!scores.length) return;
   followState.textContent = tr('followHeard', scores[0].key, scores[1] && scores[1].key);
   const idx = followTargetIdx();
@@ -2087,6 +2084,17 @@ function handleFollowOnset(){
   }
   followPos = idx;               // no catch-up match: stay put
   followMiss(idx);
+}
+
+function handleFollowOnset(){
+  if (!followOn) return;
+  micAnalyser.getFloatFrequencyData(postSpec);
+  for (let i = 0; i < deltaSpec.length; i++){
+    const post = Math.pow(10, Math.max(-100, postSpec[i]) / 20);
+    const pre = Math.pow(10, Math.max(-100, preSpec[i]) / 20);
+    deltaSpec[i] = post > pre ? post - pre : 0;
+  }
+  applyFollowScores(classifyFollowSpectrum(deltaSpec));
 }
 
 // Copy the ring snapshot closest to preSnapshotMs old as the onset reference.
@@ -2190,15 +2198,17 @@ async function startFollow(){
         console.log('[native onset]', 'peakDb=', ev.peakDb.toFixed(1),
           'flux=', ev.flux.toFixed(4), 'thresh=', ev.threshold.toFixed(4));
       });
-      // Milestone-2 shadow mode: real classification results, shown for
-      // comparison only — NOT wired to applyFollowScores/followAdvance yet
-      // (that's milestone 3). Safe to leave running: it can't affect the
-      // score cursor no matter what it says.
+      // Milestone 3: native classification results now drive the score
+      // cursor via the same applyFollowScores the local web path uses
+      // (handleFollowOnset), so the ranked candidates are both displayed
+      // for debugging and actually advance/miss the follow session.
       nativeClassifyListener = await nativeFollow.addListener('onsetEvent', ev => {
         const top = ev.candidates.slice(0, 3).map(c => `${c.key}:${c.score.toFixed(2)}`).join(' ');
         console.log('[native classify]', top);
         const d = document.getElementById('micDebug');
         if (d) d.textContent = `native heard: ${top}`;
+        if (!followOn) return;
+        applyFollowScores(ev.candidates);
       });
       await nativeFollow.startFollow();
       await nativeFollow.setSensitivity({value: Number(sensSlider && sensSlider.value) || 1});
